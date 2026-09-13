@@ -9,6 +9,8 @@
   var state = {
     all: [], nearby: [], filter: localStorage.getItem(LS_FILT) || 'all',
     userLat: null, userLng: null,
+    focusLat: null, focusLng: null,
+    searchLock: false,
     map: null, cluster: null, userMarker: null,
     markers: new Map(), selected: null,
     radiusKm: parseFloat(localStorage.getItem(LS_RAD)) || 5,
@@ -126,8 +128,16 @@
     state.map.on('moveend', function () {
       clearTimeout(moveTimer);
       moveTimer = setTimeout(function () {
-        if (state.userLat == null) refreshNearby();
-      }, 450);
+        var btn = $('searchAreaBtn');
+        if (!btn) return;
+        if (state.focusLat == null) {
+          if (state.map.getZoom() >= 10) btn.hidden = false;
+          return;
+        }
+        var c = state.map.getCenter();
+        var d = haversine(state.focusLat, state.focusLng, c.lat, c.lng);
+        btn.hidden = d < 1200;
+      }, 200);
     });
   }
 
@@ -204,8 +214,8 @@
   async function refreshNearby() {
     if (!state.map || state.loading) return;
     var c = state.map.getCenter();
-    var lat = state.userLat != null ? state.userLat : c.lat;
-    var lng = state.userLng != null ? state.userLng : c.lng;
+    var lat = state.focusLat != null ? state.focusLat : c.lat;
+    var lng = state.focusLng != null ? state.focusLng : c.lng;
     var max = state.radiusKm * 1000;
     state.loading = true;
     $('meta').textContent = 'Loading nearby…';
@@ -249,7 +259,7 @@
   function renderList() {
     var el = $('list');
     var n = state.nearby.length;
-    var where = state.userLat != null ? 'of you' : 'of map centre';
+    var where = (state.focusLat != null && state.userLat != null && Math.abs(state.focusLat - state.userLat) < 1e-8) ? 'of you' : (state.focusLat != null ? 'of search' : 'of map centre');
     $('meta').textContent = n ? (n + ' within ' + state.radiusKm + ' km ' + where) : ('No matches within ' + state.radiusKm + ' km');
 
     if (!n) {
@@ -397,6 +407,7 @@
   function locate() {
     if (!navigator.geolocation) { toast('Location not supported'); return; }
     if (state.locating) return;
+    state.searchLock = false;
     state.locating = true;
     $('locateBtn').classList.add('active');
     toast('Finding your location…');
@@ -404,11 +415,16 @@
       function (pos) {
         state.locating = false;
         $('locateBtn').classList.remove('active');
+        if (state.searchLock) return;
         state.userLat = pos.coords.latitude;
         state.userLng = pos.coords.longitude;
+        state.focusLat = state.userLat;
+        state.focusLng = state.userLng;
         setUser(state.userLat, state.userLng);
         state.map.setView([state.userLat, state.userLng], 14);
         refreshNearby();
+        var btn = $('searchAreaBtn');
+        if (btn) btn.hidden = true;
         toast('Toilets near you');
       },
       function (err) {
@@ -424,19 +440,33 @@
   async function searchPlace(q) {
     if (!q || q.length < 2) return;
     toast('Searching…');
+    state.searchLock = true;
     try {
       var url = 'https://nominatim.openstreetmap.org/search?format=json&countrycodes=gb&q=' + encodeURIComponent(q) + '&limit=1';
       var res = await fetch(url, { headers: { 'Accept-Language': 'en', 'User-Agent': 'GotToGo/3.0' } });
       var data = await res.json();
       if (!data.length) { toast('No place found in the UK'); return; }
       var lat = parseFloat(data[0].lat), lng = parseFloat(data[0].lon);
-      state.userLat = lat; state.userLng = lng;
+      state.focusLat = lat;
+      state.focusLng = lng;
       state.map.setView([lat, lng], 13);
-      setUser(lat, lng);
       if (state.radiusKm < 8) { $('radius').value = '10'; state.radiusKm = 10; localStorage.setItem(LS_RAD, '10'); }
       await refreshNearby();
+      var btn = $('searchAreaBtn');
+      if (btn) btn.hidden = true;
       toast(data[0].display_name.split(',').slice(0, 2).join(','));
     } catch (e) { toast('Search failed — check connection'); }
+  }
+
+  function searchThisArea() {
+    var c = state.map.getCenter();
+    state.searchLock = true;
+    state.focusLat = c.lat;
+    state.focusLng = c.lng;
+    refreshNearby();
+    toast('Searching this area');
+    var btn = $('searchAreaBtn');
+    if (btn) btn.hidden = true;
   }
 
   function applyTheme() {
@@ -447,6 +477,7 @@
   $('locateBtn').onclick = locate;
   $('fabLocate').onclick = locate;
   $('fabNearest').onclick = goNearest;
+  if ($('searchAreaBtn')) $('searchAreaBtn').onclick = searchThisArea;
   $('themeBtn').onclick = function () {
     var next = document.body.classList.contains('light') ? 'dark' : 'light';
     localStorage.setItem(LS_THEME, next);
