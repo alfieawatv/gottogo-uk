@@ -1,6 +1,5 @@
-const CACHE = 'gottogo-v3';
+const CACHE = 'gottogo-v4';
 const ASSETS = ['./', './index.html', './app.js', './styles.css', './manifest.json', './icon.svg'];
-
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)).then(() => self.skipWaiting()));
 });
