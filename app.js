@@ -5,7 +5,6 @@
   var LS_RAD = 'g2g_radius';
   var LS_THEME = 'g2g_theme';
   var LS_CACHE = 'g2g_cache';
-  var LS_INSTALL = 'g2g_install_dismiss';
 
   var state = {
     all: [], nearby: [], filter: localStorage.getItem(LS_FILT) || 'all',
@@ -15,8 +14,7 @@
     radiusKm: parseFloat(localStorage.getItem(LS_RAD)) || 5,
     locating: false, loading: false, offline: false,
     favs: loadJson(LS_FAV, {}),
-    rates: loadJson(LS_RATE, {}),
-    deferredPrompt: null
+    rates: loadJson(LS_RATE, {})
   };
 
   var GQL = 'https://www.toiletmap.org.uk/api';
@@ -507,23 +505,6 @@
     state.offline = true;
     $('offlineBanner').hidden = false;
   });
-
-  window.addEventListener('beforeinstallprompt', function (e) {
-    e.preventDefault();
-    state.deferredPrompt = e;
-    if (!localStorage.getItem(LS_INSTALL)) $('installBanner').hidden = false;
-  });
-  $('installBtn').onclick = async function () {
-    if (!state.deferredPrompt) return;
-    state.deferredPrompt.prompt();
-    await state.deferredPrompt.userChoice;
-    state.deferredPrompt = null;
-    $('installBanner').hidden = true;
-  };
-  $('installDismiss').onclick = function () {
-    localStorage.setItem(LS_INSTALL, '1');
-    $('installBanner').hidden = true;
-  };
 
   applyTheme();
   initMap();
