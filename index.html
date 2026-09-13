@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="theme-color" content="#0f766e" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="description" content="Find public toilets across the UK. Official Toilet Map data — 16,000+ facilities." />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="icon" href="icon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="icon.svg" />
+  <title>Got to Go — UK Toilet Finder</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="splash" id="splash">
+    <div class="splash-logo">🚽</div>
+    <h1>Got <span>to</span> Go</h1>
+    <p>UK public toilet finder</p>
+    <div class="splash-bar"><i></i></div>
+  </div>
+
+  <div id="app">
+    <header class="header">
+      <div class="header-row">
+        <div class="brand">
+          <div class="brand-icon">🚽</div>
+          Got <span>to</span> Go
+        </div>
+        <div class="search-box" id="searchBox">
+          <svg class="s-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+          <input id="search" type="search" placeholder="Town or postcode…" autocomplete="off" enterkeyhint="search" />
+          <button type="button" class="clear" id="searchClear" aria-label="Clear">✕</button>
+        </div>
+        <button class="btn-icon" id="locateBtn" title="My location" aria-label="My location">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
+        </button>
+      </div>
+      <div class="toolbar">
+        <button class="chip active" data-f="all">All</button>
+        <button class="chip" data-f="accessible">♿ Accessible</button>
+        <button class="chip" data-f="free">Free</button>
+        <button class="chip" data-f="baby">Baby change</button>
+        <button class="chip" data-f="radar">RADAR</button>
+        <button class="chip" data-f="gender">All-gender</button>
+        <select class="radius-select" id="radius" aria-label="Search radius">
+          <option value="2">2 km</option>
+          <option value="5" selected>5 km</option>
+          <option value="10">10 km</option>
+          <option value="20">20 km</option>
+        </select>
+      </div>
+    </header>
+
+    <div class="main">
+      <div id="map"></div>
+      <button class="fab" id="fabLocate" title="Recentre on me" aria-label="Recentre">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
+      </button>
+      <aside class="panel" id="panel">
+        <div class="handle" id="handle"></div>
+        <div class="panel-head">
+          <div>
+            <div class="panel-title">Nearby toilets</div>
+            <div class="panel-meta" id="meta">Loading…</div>
+          </div>
+          <div class="panel-actions">
+            <button class="mini-btn" id="expandBtn" type="button">Expand</button>
+          </div>
+        </div>
+        <div class="list" id="list"></div>
+      </aside>
+      <div class="detail" id="detail"></div>
+    </div>
+  </div>
+  <div class="toast" id="toast"></div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
