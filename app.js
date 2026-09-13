@@ -61,6 +61,15 @@
     return String(s || '').replace(/&/g, '&').replace(/</g, '<').replace(/>/g, '>').replace(/"/g, '"');
   }
 
+  var BAD = /\b(fuck(?:ing|ed|er|s)?|shit(?:ty|s)?|bollocks|bastard(?:s)?|arse(?:hole)?s?|asshole(?:s)?|cunt(?:s)?|twat(?:s)?|dick(?:head)?s?|cock(?:s)?|piss(?:ing|ed)?|wank(?:er|ing)?s?|motherfuck(?:er|ing)?s?|bloody hell)\b/gi;
+  function censor(s) {
+    if (!s) return '';
+    return String(s).replace(BAD, function (m) {
+      if (m.length <= 1) return '#';
+      return m[0] + '#'.repeat(m.length - 1);
+    });
+  }
+
   function isOpenNow(openingTimes) {
     if (!openingTimes || !openingTimes.length) return null;
     var d = new Date();
@@ -95,7 +104,7 @@
     var open = isOpenNow(t.openingTimes);
     return {
       i: t.id,
-      n: (t.name && String(t.name).trim()) || 'Public Toilet',
+      n: censor((t.name && String(t.name).trim()) || 'Public Toilet'),
       a: area || '',
       lat: +lat, lng: +lng,
       w: t.accessible === true ? 1 : 0,
@@ -103,8 +112,8 @@
       b: t.babyChange === true ? 1 : 0,
       r: t.radar === true ? 1 : 0,
       g: t.allGender === true ? 1 : 0,
-      note: t.notes || null,
-      pay: t.paymentDetails || null,
+      note: t.notes ? censor(t.notes) : null,
+      pay: t.paymentDetails ? censor(String(t.paymentDetails)) : null,
       ot: t.openingTimes || null,
       open: open,
       hours: formatHours(t.openingTimes),
