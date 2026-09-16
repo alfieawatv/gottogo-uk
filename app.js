@@ -263,6 +263,45 @@
     $('list').innerHTML = '<div class="skel"></div><div class="skel"></div><div class="skel"></div>';
   }
 
+  function friendlyError(err) {
+    var msg = (err && err.message) ? String(err.message) : '';
+    var offline = (typeof navigator !== 'undefined' && navigator.onLine === false);
+    if (offline || /failed to fetch|networkerror|network request failed|load failed/i.test(msg)) {
+      return {
+        title: 'No connection',
+        body: 'Can\u2019t reach the internet. Check Wi\u2011Fi or mobile data, then try again.'
+      };
+    }
+    if (/timeout|aborted|timed out/i.test(msg)) {
+      return {
+        title: 'Taking too long',
+        body: 'The connection is slow or timed out. Try again on a stronger signal.'
+      };
+    }
+    if (/HTTP 404|empty dataset|could not load toilet/i.test(msg)) {
+      return {
+        title: 'Data unavailable',
+        body: 'Toilet data couldn\u2019t be downloaded right now. Please try again in a moment.'
+      };
+    }
+    if (/HTTP 5\d\d|server/i.test(msg)) {
+      return {
+        title: 'Server problem',
+        body: 'Something went wrong on the server. Please try again shortly.'
+      };
+    }
+    return {
+      title: 'Couldn\u2019t load',
+      body: 'Something went wrong loading toilets. Check your connection and try again.'
+    };
+  }
+
+  function errorActionsHtml(retryId) {
+    return '<div style="margin-top:16px;display:flex;justify-content:center">' +
+      '<button type="button" class="btn primary" id="' + retryId + '" style="width:auto;min-width:140px;max-width:200px;padding:12px 24px;box-sizing:border-box;flex:0 0 auto">Try again</button>' +
+      '</div>';
+  }
+
   function matches(t) {
     var f = state.filter;
     if (f === 'all') return true;
@@ -312,8 +351,9 @@
       applyList();
     } catch (e) {
       console.warn(e);
-      $('meta').textContent = 'Could not filter toilets';
-      $('list').innerHTML = '<div class="empty"><div class="emoji">\ud83d\udce1</div><h3>Couldn\u2019t load toilets</h3><p>Try refreshing the page.</p><button class="btn primary" style="margin-top:14px;max-width:200px;margin-left:auto;margin-right:auto" id="listRetry">Try again</button></div>';
+      var fe2 = friendlyError(e);
+      $('meta').textContent = fe2.title;
+      $('list').innerHTML = '<div class="empty"><div class="emoji">\ud83d\udce1</div><h3>' + fe2.title + '</h3><p>' + fe2.body + '</p>' + errorActionsHtml('listRetry') + '</div>';
       var lr = document.getElementById('listRetry');
       if (lr) lr.onclick = function () { location.reload(); };
     } finally {
@@ -335,7 +375,7 @@
     $('meta').textContent = n ? (n + ' within ' + state.radiusKm + ' km ' + where) : ('No matches within ' + state.radiusKm + ' km');
 
     if (!n) {
-      el.innerHTML = '<div class="empty"><div class="emoji">\ud83d\udd0d</div><h3>Nothing nearby</h3><p>Try a larger radius, clear filters,<br/>or search a town / postcode.</p><button class="btn primary" style="margin-top:14px;max-width:200px;margin-left:auto;margin-right:auto" id="emptyRadius">Set radius 10 km</button></div>';
+      el.innerHTML = '<div class="empty"><div class="emoji">\ud83d\udd0d</div><h3>Nothing nearby</h3><p>Try a larger radius, clear filters,<br/>or search a town / postcode.</p><div style="margin-top:16px;display:flex;justify-content:center"><button class="btn primary" style="width:auto;min-width:140px;max-width:200px;padding:12px 24px;flex:0 0 auto" id="emptyRadius">Set radius 10 km</button></div></div>';
       var b = document.getElementById('emptyRadius');
       if (b) b.onclick = function () { $('radius').value = '10'; state.radiusKm = 10; localStorage.setItem(LS_RAD, '10'); refreshNearby(); };
       return;
@@ -619,13 +659,13 @@
       else refreshNearby();
     })
     .catch(function (err) {
+      var fe = friendlyError(err);
       $('splash').innerHTML =
         '<div style="font-size:2.5rem">\ud83d\udce1</div>' +
-        '<h1 style="font-size:1.2rem;margin-top:12px">Couldn\u2019t load data</h1>' +
+        '<h1 style="font-size:1.2rem;margin-top:12px">' + fe.title + '</h1>' +
         '<p style="color:var(--muted);max-width:280px;text-align:center;margin-top:8px;line-height:1.45">' +
-        'Could not download the toilet dataset. Check your connection and try again.</p>' +
-        '<p style="color:var(--muted);font-size:.75rem;margin-top:6px">' + esc(err && err.message ? err.message : 'Failed to fetch') + '</p>' +
-        '<button class="btn primary" style="margin-top:16px;width:100%;max-width:220px;box-sizing:border-box" id="retryBtn">Try again</button>';
+        fe.body + '</p>' +
+        errorActionsHtml('retryBtn');
       var btn = document.getElementById('retryBtn');
       if (btn) btn.onclick = function () { location.reload(); };
     });
