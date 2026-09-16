@@ -168,20 +168,75 @@
     }
   }
 
+  function setSplashStatus(msg) {
+    var splash = $('splash');
+    if (!splash || splash.classList.contains('hide')) return;
+    var p = splash.querySelector('[data-status]');
+    if (p) p.textContent = msg;
+  }
+
+  function showSplashSpinner() {
+    var splash = $('splash');
+    if (!splash) return;
+    if (!splash.querySelector('.spinner')) {
+      var spin = document.createElement('div');
+      spin.className = 'spinner';
+      spin.setAttribute('aria-hidden', 'true');
+      var bar = splash.querySelector('.splash-bar');
+      if (bar) bar.replaceWith(spin);
+      else splash.appendChild(spin);
+    }
+    if (!splash.querySelector('[data-status]')) {
+      var st = document.createElement('p');
+      st.setAttribute('data-status', '');
+      st.style.cssText = 'color:var(--muted);font-size:.85rem;margin-top:4px;text-align:center;max-width:260px';
+      st.textContent = 'Connecting to Toilet Map…';
+      splash.appendChild(st);
+    }
+  }
+
+  async function fetchOnce(lat, lng, radiusM, timeoutMs) {
+    var ctrl = new AbortController();
+    var timer = setTimeout(function () { ctrl.abort(); }, timeoutMs);
+    try {
+      var res = await fetch(GQL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        body: JSON.stringify({
+          query: PROXIMITY_QUERY,
+          variables: { from: { lat: lat, lng: lng, maxDistance: Math.round(radiusM) } }
+        }),
+        signal: ctrl.signal
+      });
+      if (!res.ok) throw new Error('Toilet Map API HTTP ' + res.status);
+      var json = await res.json();
+      if (json.errors && json.errors.length) throw new Error(json.errors[0].message || 'GraphQL error');
+      var list = (json.data && json.data.loosByProximity) || [];
+      return list.map(function (t) { return mapToilet(t, lat, lng); }).filter(Boolean);
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
   async function fetchNearby(lat, lng, radiusM) {
-    var res = await fetch(GQL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-      body: JSON.stringify({
-        query: PROXIMITY_QUERY,
-        variables: { from: { lat: lat, lng: lng, maxDistance: Math.round(radiusM) } }
-      })
-    });
-    if (!res.ok) throw new Error('Toilet Map API HTTP ' + res.status);
-    var json = await res.json();
-    if (json.errors && json.errors.length) throw new Error(json.errors[0].message || 'GraphQL error');
-    var list = (json.data && json.data.loosByProximity) || [];
-    return list.map(function (t) { return mapToilet(t, lat, lng); }).filter(Boolean);
+    var attempts = [
+      { wait: 0, timeout: 8000, label: 'Connecting to Toilet Map…' },
+      { wait: 1500, timeout: 10000, label: 'Still loading — retrying…' },
+      { wait: 2000, timeout: 12000, label: 'Taking a bit longer… almost there' }
+    ];
+    var lastErr = null;
+    for (var i = 0; i < attempts.length; i++) {
+      var a = attempts[i];
+      setSplashStatus(a.label);
+      if (a.wait) await new Promise(function (r) { setTimeout(r, a.wait); });
+      try {
+        return await fetchOnce(lat, lng, radiusM, a.timeout);
+      } catch (e) {
+        lastErr = e;
+        console.warn('Fetch attempt ' + (i + 1) + ' failed', e);
+      }
+    }
+    throw lastErr || new Error('Failed to fetch');
   }
 
   function showSkeletons() {
@@ -189,7 +244,9 @@
   }
 
   async function loadData() {
+    showSplashSpinner();
     showSkeletons();
+    setSplashStatus('Connecting to Toilet Map…');
     try {
       var items = await fetchNearby(54.5, -2.5, 50000);
       state.all = items;
@@ -249,9 +306,11 @@
         applyList();
         toast('Offline — cached results');
       } else {
-        toast('Could not load toilets nearby');
-        $('meta').textContent = 'Failed to load — try again';
-        $('list').innerHTML = '<div class="empty"><div class="emoji">📡</div><h3>Couldn’t load toilets</h3><p>Check your connection and try again.</p></div>';
+        $('meta').textContent = 'Still trying…';
+        $('list').innerHTML = '<div class="empty"><div class="spinner" style="margin:0 auto 12px"></div><h3>Loading toilets</h3><p>Waiting for Toilet Map…</p><button class="btn primary" style="margin-top:14px;max-width:200px;margin-left:auto;margin-right:auto" id="listRetry">Try again</button></div>';
+        var lr = document.getElementById('listRetry');
+        if (lr) lr.onclick = function () { refreshNearby(); };
+        toast('Could not load — tap Try again');
       }
     } finally {
       state.loading = false;
@@ -559,8 +618,10 @@
       $('splash').innerHTML =
         '<div style="font-size:2.5rem">📡</div>' +
         '<h1 style="font-size:1.2rem;margin-top:12px">Couldn’t load data</h1>' +
-        '<p style="color:var(--muted);max-width:260px;text-align:center;margin-top:8px">' + esc(err.message) + '</p>' +
-        '<button class="btn primary" style="margin-top:16px;max-width:200px" id="retryBtn">Try again</button>';
+        '<p style="color:var(--muted);max-width:280px;text-align:center;margin-top:8px;line-height:1.45">' +
+        'The Toilet Map server did not respond in time. Check your connection — we will keep trying if you tap below.</p>' +
+        '<p style="color:var(--muted);font-size:.75rem;margin-top:6px">' + esc(err && err.message ? err.message : 'Failed to fetch') + '</p>' +
+        '<button class="btn primary" style="margin-top:16px;width:100%;max-width:220px;box-sizing:border-box" id="retryBtn">Try again</button>';
       var btn = document.getElementById('retryBtn');
       if (btn) btn.onclick = function () { location.reload(); };
     });
