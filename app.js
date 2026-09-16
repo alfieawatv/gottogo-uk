@@ -433,7 +433,7 @@
         [1,2,3,4,5].map(function (n) {
           return '<button type="button" data-r="' + n + '" class="' + (myRate >= n ? 'on' : '') + '">\u2605</button>';
         }).join('') + '</div>' +
-      '<a class="btn" href="' + tm + '" target="_blank" rel="noopener" style="margin-bottom:8px">View / report on Toilet Map</a>' +
+      '<a class="mini-btn" href="' + tm + '" target="_blank" rel="noopener" style="margin-bottom:10px;display:inline-block;text-decoration:none">Report</a>' +
       '<div class="credit">Contains data from the <a href="https://www.toiletmap.org.uk/dataset" target="_blank" rel="noopener">Toilet Map</a> \u00a9 Public Convenience Ltd \u2014 <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a>. Location stays on your device.</div>';
     el.classList.add('open');
 
