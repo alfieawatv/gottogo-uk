@@ -433,9 +433,9 @@
         [1,2,3,4,5].map(function (n) {
           return '<button type="button" data-r="' + n + '" class="' + (myRate >= n ? 'on' : '') + '">\u2605</button>';
         }).join('') + '</div>' +
-      '<p style="margin:8px 0 0;font-size:.75rem"><a href="' + tm + '" target="_blank" rel="noopener" style="color:var(--muted);text-decoration:underline">Report on TM</a></p>' +
-      '<p style="margin:6px 0 0;font-size:.72rem;color:var(--muted)">Created by Alfie Watts</p>' +
-      '<div class="credit">Contains data from the <a href="https://www.toiletmap.org.uk/dataset" target="_blank" rel="noopener">Toilet Map</a> \u00a9 Public Convenience Ltd \u2014 <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a>. Location stays on your device.</div>';
+      '<p style="margin:10px 0 4px;font-size:.8rem;color:var(--muted)"><a href="' + tm + '" target="_blank" rel="noopener" style="color:var(--muted);text-decoration:underline">Report on TM</a></p>' +
+      '<p style="margin:0 0 12px;font-size:.85rem;font-weight:600;color:var(--text)">Created by Alfie Watts</p>' +
+      '<div class="credit">Contains data from the <a href="https://www.toiletmap.org.uk/dataset" target="_blank" rel="noopener">Toilet Map</a> \u00a9 Public Convenience Ltd \u2014 <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a>. Location stays on your device.<br/>App by Alfie Watts.</div>';
     el.classList.add('open');
 
     $('backBtn').onclick = function () {
