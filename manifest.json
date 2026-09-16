@@ -1,7 +1,7 @@
 {
-  "name": "Got to Go — UK Toilet Finder",
+  "name": "Got to Go – Find toilets near you",
   "short_name": "Got to Go",
-  "description": "Find public toilets across the UK using the official Toilet Map dataset.",
+  "description": "Find public toilets near you in the UK. Accessible, free, baby change and RADAR filters.",
   "start_url": "./",
   "display": "standalone",
   "background_color": "#0b1220",
