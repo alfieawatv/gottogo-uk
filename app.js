@@ -7,7 +7,7 @@
   var LS_CACHE = 'g2g_cache';
 
   var state = {
-    all: [], nearby: [], filter: localStorage.getItem(LS_FILT) || 'all',
+    all: [], static: [], nearby: [], filter: localStorage.getItem(LS_FILT) || 'all',
     userLat: null, userLng: null,
     focusLat: null, focusLng: null,
     searchLock: false,
@@ -21,6 +21,9 @@
 
   var GQL = 'https://www.toiletmap.org.uk/api';
   var PROXIMITY_QUERY = 'query($from: ProximityInput!) { loosByProximity(from: $from) { id name accessible babyChange radar allGender noPayment notes openingTimes paymentDetails location { lat lng } area { name } } }';
+  var STATIC_URL = 'https://p02w6qqjlqmja4sk.public.blob.vercel-storage.com/exports/toilets-2026-09-16T00%3A00%3A40.869Z-vRPZ3vhRc0EJZy4t6bv7JOCAOqx8UX.json';
+  var STATIC_FALLBACK = './toilets.json';
+  var staticLoaded = false;
 
   function $(id) { return document.getElementById(id); }
   function loadJson(k, d) { try { return JSON.parse(localStorage.getItem(k)) || d; } catch (e) { return d; } }
@@ -92,33 +95,8 @@
     var d = new Date();
     var day = (d.getDay() + 6) % 7;
     var slot = openingTimes[day];
-    if (slot && slot[0] && slot[1]) return days[day] + ' ' + slot[0] + '–' + slot[1];
+    if (slot && slot[0] && slot[1]) return days[day] + ' ' + slot[0] + '\u2013' + slot[1];
     return null;
-  }
-
-  function mapToilet(t, refLat, refLng) {
-    var lat = t.location && t.location.lat;
-    var lng = t.location && t.location.lng;
-    if (lat == null || lng == null) return null;
-    var area = Array.isArray(t.area) && t.area[0] ? t.area[0].name : '';
-    var open = isOpenNow(t.openingTimes);
-    return {
-      i: t.id,
-      n: censor((t.name && String(t.name).trim()) || 'Public Toilet'),
-      a: area || '',
-      lat: +lat, lng: +lng,
-      w: t.accessible === true ? 1 : 0,
-      f: t.noPayment === true ? 0 : (t.noPayment === false ? 1 : -1),
-      b: t.babyChange === true ? 1 : 0,
-      r: t.radar === true ? 1 : 0,
-      g: t.allGender === true ? 1 : 0,
-      note: t.notes ? censor(t.notes) : null,
-      pay: t.paymentDetails ? censor(String(t.paymentDetails)) : null,
-      ot: t.openingTimes || null,
-      open: open,
-      hours: formatHours(t.openingTimes),
-      dist: haversine(refLat, refLng, +lat, +lng)
-    };
   }
 
   function initMap() {
@@ -153,7 +131,7 @@
   function pinIcon(selected) {
     return L.divIcon({
       className: '',
-      html: '<div class="pin' + (selected ? ' selected' : '') + '"><span>🚽</span></div>',
+      html: '<div class="pin' + (selected ? ' selected' : '') + '"><span>\ud83d\udebd</span></div>',
       iconSize: [34, 34], iconAnchor: [17, 34], popupAnchor: [0, -30]
     });
   }
@@ -190,78 +168,99 @@
       var st = document.createElement('p');
       st.setAttribute('data-status', '');
       st.style.cssText = 'color:var(--muted);font-size:.85rem;margin-top:4px;text-align:center;max-width:260px';
-      st.textContent = 'Connecting to Toilet Map…';
+      st.textContent = 'Loading UK toilet data\u2026';
       splash.appendChild(st);
     }
   }
 
-  async function fetchOnce(lat, lng, radiusM, timeoutMs) {
-    var ctrl = new AbortController();
-    var timer = setTimeout(function () { ctrl.abort(); }, timeoutMs);
-    try {
-      var res = await fetch(GQL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-        body: JSON.stringify({
-          query: PROXIMITY_QUERY,
-          variables: { from: { lat: lat, lng: lng, maxDistance: Math.round(radiusM) } }
-        }),
-        signal: ctrl.signal
-      });
-      if (!res.ok) throw new Error('Toilet Map API HTTP ' + res.status);
-      var json = await res.json();
-      if (json.errors && json.errors.length) throw new Error(json.errors[0].message || 'GraphQL error');
-      var list = (json.data && json.data.loosByProximity) || [];
-      return list.map(function (t) { return mapToilet(t, lat, lng); }).filter(Boolean);
-    } finally {
-      clearTimeout(timer);
+  function normalizeRawToilet(t) {
+    if (!t) return null;
+    if (t.i && t.lat != null && t.lng != null) {
+      return {
+        i: t.i, n: censor(t.n || 'Public Toilet'), a: t.a || '',
+        lat: +t.lat, lng: +t.lng,
+        w: t.w || 0, f: (t.f == null ? -1 : t.f), b: t.b || 0, r: t.r || 0, g: t.g || 0,
+        note: t.note ? censor(t.note) : null,
+        pay: t.pay ? censor(String(t.pay)) : null,
+        ot: t.ot || null,
+        open: isOpenNow(t.ot), hours: formatHours(t.ot)
+      };
     }
+    if (t.active === false) return null;
+    var loc = t.location || {};
+    var lat = loc.lat, lng = loc.lng;
+    if (lat == null && loc.coordinates) {
+      lng = loc.coordinates[0]; lat = loc.coordinates[1];
+    }
+    if (lat == null || lng == null) return null;
+    var area = '';
+    if (Array.isArray(t.areas) && t.areas[0]) area = t.areas[0].name || '';
+    else if (Array.isArray(t.area) && t.area[0]) area = t.area[0].name || '';
+    var ot = t.opening_times || t.openingTimes || null;
+    return {
+      i: t.id,
+      n: censor((t.name && String(t.name).trim()) || 'Public Toilet'),
+      a: area,
+      lat: +lat, lng: +lng,
+      w: t.accessible === true ? 1 : 0,
+      f: (t.no_payment === true || t.noPayment === true) ? 0 : ((t.no_payment === false || t.noPayment === false) ? 1 : -1),
+      b: (t.baby_change === true || t.babyChange === true) ? 1 : 0,
+      r: t.radar === true ? 1 : 0,
+      g: (t.all_gender === true || t.allGender === true) ? 1 : 0,
+      note: (t.notes ? censor(String(t.notes).slice(0, 400)) : null),
+      pay: (t.payment_details || t.paymentDetails) ? censor(String(t.payment_details || t.paymentDetails).slice(0, 120)) : null,
+      ot: ot,
+      open: isOpenNow(ot),
+      hours: formatHours(ot)
+    };
   }
 
-  async function fetchNearby(lat, lng, radiusM) {
-    var attempts = [
-      { wait: 0, timeout: 8000, label: 'Connecting to Toilet Map…' },
-      { wait: 1500, timeout: 10000, label: 'Still loading — retrying…' },
-      { wait: 2000, timeout: 12000, label: 'Taking a bit longer… almost there' }
-    ];
-    var lastErr = null;
-    for (var i = 0; i < attempts.length; i++) {
-      var a = attempts[i];
-      setSplashStatus(a.label);
-      if (a.wait) await new Promise(function (r) { setTimeout(r, a.wait); });
+  async function loadStatic() {
+    setSplashStatus('Loading UK toilet dataset\u2026');
+    showSplashSpinner();
+    var urls = [STATIC_URL];
+    if (typeof STATIC_FALLBACK !== 'undefined' && STATIC_FALLBACK) urls.push(STATIC_FALLBACK);
+    var list = null, lastErr = null;
+    for (var u = 0; u < urls.length; u++) {
       try {
-        return await fetchOnce(lat, lng, radiusM, a.timeout);
+        setSplashStatus(u === 0 ? 'Loading toilet data\u2026' : 'Trying backup source\u2026');
+        var res = await fetch(urls[u], { cache: 'force-cache' });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        var raw = await res.json();
+        if (!Array.isArray(raw) || !raw.length) throw new Error('Empty dataset');
+        list = [];
+        for (var i = 0; i < raw.length; i++) {
+          var n = normalizeRawToilet(raw[i]);
+          if (n) list.push(n);
+        }
+        if (list.length) break;
       } catch (e) {
         lastErr = e;
-        console.warn('Fetch attempt ' + (i + 1) + ' failed', e);
+        console.warn('Static load failed', urls[u], e);
       }
     }
-    throw lastErr || new Error('Failed to fetch');
-  }
-
-  function showSkeletons() {
-    $('list').innerHTML = '<div class="skel"></div><div class="skel"></div><div class="skel"></div>';
+    if (!list || !list.length) throw lastErr || new Error('Could not load toilet dataset');
+    state.static = list;
+    staticLoaded = true;
+    state.all = list;
+    saveJson(LS_CACHE, { at: Date.now(), n: list.length });
+    $('meta').textContent = list.length.toLocaleString() + ' UK toilets loaded';
+    return list;
   }
 
   async function loadData() {
     showSplashSpinner();
     showSkeletons();
-    setSplashStatus('Connecting to Toilet Map…');
     try {
-      var items = await fetchNearby(54.5, -2.5, 50000);
-      state.all = items;
-      saveJson(LS_CACHE, { at: Date.now(), items: items.slice(0, 100), lat: 54.5, lng: -2.5 });
-      $('meta').textContent = 'Ready · Toilet Map live data';
+      await loadStatic();
     } catch (e) {
-      var cache = loadJson(LS_CACHE, null);
-      if (cache && cache.items && cache.items.length) {
-        state.all = cache.items;
-        state.offline = true;
-        $('offlineBanner').hidden = false;
-        $('meta').textContent = 'Cached results';
-        toast('Using cached toilets');
-      } else throw e;
+      console.warn(e);
+      throw e;
     }
+  }
+
+  function showSkeletons() {
+    $('list').innerHTML = '<div class="skel"></div><div class="skel"></div><div class="skel"></div>';
   }
 
   function matches(t) {
@@ -284,34 +283,39 @@
     var lng = state.focusLng != null ? state.focusLng : c.lng;
     var max = state.radiusKm * 1000;
     state.loading = true;
-    $('meta').textContent = 'Loading nearby…';
+    $('meta').textContent = 'Finding nearby\u2026';
     showSkeletons();
     try {
-      var items = await fetchNearby(lat, lng, max);
+      var source = state.static && state.static.length ? state.static : state.all;
+      if (!source || !source.length) {
+        if (!staticLoaded) await loadStatic();
+        source = state.static;
+      }
+      var items = [];
+      for (var i = 0; i < source.length; i++) {
+        var t = source[i];
+        var d = haversine(lat, lng, t.lat, t.lng);
+        if (d <= max) {
+          items.push({
+            i: t.i, n: t.n, a: t.a, lat: t.lat, lng: t.lng,
+            w: t.w, f: t.f, b: t.b, r: t.r, g: t.g,
+            note: t.note || null, pay: t.pay || null,
+            ot: t.ot || null, open: t.open, hours: t.hours,
+            dist: d
+          });
+        }
+      }
+      items.sort(function (a, b) { return a.dist - b.dist; });
       state.all = items;
       state.offline = false;
-      $('offlineBanner').hidden = true;
-      saveJson(LS_CACHE, { at: Date.now(), items: items.slice(0, 150), lat: lat, lng: lng });
+      if ($('offlineBanner')) $('offlineBanner').hidden = true;
       applyList();
     } catch (e) {
       console.warn(e);
-      var cache = loadJson(LS_CACHE, null);
-      if (cache && cache.items && cache.items.length) {
-        state.all = cache.items.map(function (t) {
-          t.dist = haversine(lat, lng, t.lat, t.lng);
-          return t;
-        });
-        state.offline = true;
-        $('offlineBanner').hidden = false;
-        applyList();
-        toast('Offline — cached results');
-      } else {
-        $('meta').textContent = 'Still trying…';
-        $('list').innerHTML = '<div class="empty"><div class="spinner" style="margin:0 auto 12px"></div><h3>Loading toilets</h3><p>Waiting for Toilet Map…</p><button class="btn primary" style="margin-top:14px;max-width:200px;margin-left:auto;margin-right:auto" id="listRetry">Try again</button></div>';
-        var lr = document.getElementById('listRetry');
-        if (lr) lr.onclick = function () { refreshNearby(); };
-        toast('Could not load — tap Try again');
-      }
+      $('meta').textContent = 'Could not filter toilets';
+      $('list').innerHTML = '<div class="empty"><div class="emoji">\ud83d\udce1</div><h3>Couldn\u2019t load toilets</h3><p>Try refreshing the page.</p><button class="btn primary" style="margin-top:14px;max-width:200px;margin-left:auto;margin-right:auto" id="listRetry">Try again</button></div>';
+      var lr = document.getElementById('listRetry');
+      if (lr) lr.onclick = function () { location.reload(); };
     } finally {
       state.loading = false;
     }
@@ -331,7 +335,7 @@
     $('meta').textContent = n ? (n + ' within ' + state.radiusKm + ' km ' + where) : ('No matches within ' + state.radiusKm + ' km');
 
     if (!n) {
-      el.innerHTML = '<div class="empty"><div class="emoji">🔍</div><h3>Nothing nearby</h3><p>Try a larger radius, clear filters,<br/>or search a town / postcode.</p><button class="btn primary" style="margin-top:14px;max-width:200px;margin-left:auto;margin-right:auto" id="emptyRadius">Set radius 10 km</button></div>';
+      el.innerHTML = '<div class="empty"><div class="emoji">\ud83d\udd0d</div><h3>Nothing nearby</h3><p>Try a larger radius, clear filters,<br/>or search a town / postcode.</p><button class="btn primary" style="margin-top:14px;max-width:200px;margin-left:auto;margin-right:auto" id="emptyRadius">Set radius 10 km</button></div>';
       var b = document.getElementById('emptyRadius');
       if (b) b.onclick = function () { $('radius').value = '10'; state.radiusKm = 10; localStorage.setItem(LS_RAD, '10'); refreshNearby(); };
       return;
@@ -341,14 +345,14 @@
       var badges = [];
       if (t.open === true) badges.push('<span class="badge open">Open</span>');
       if (t.open === false) badges.push('<span class="badge closed">Closed</span>');
-      if (t.w) badges.push('<span class="badge ok">♿</span>');
+      if (t.w) badges.push('<span class="badge ok">\u267f</span>');
       if (t.f === 0) badges.push('<span class="badge">Free</span>');
       if (t.f === 1) badges.push('<span class="badge fee">Fee</span>');
       if (t.b) badges.push('<span class="badge">Baby</span>');
       if (t.r) badges.push('<span class="badge info">RADAR</span>');
-      if (state.favs[t.i]) badges.push('<span class="badge fee">★</span>');
+      if (state.favs[t.i]) badges.push('<span class="badge fee">\u2605</span>');
       return '<div class="card' + (state.selected === t.i ? ' active' : '') + '" data-id="' + t.i + '" role="button" tabindex="0">' +
-        '<div class="card-icon">🚽</div><div class="card-body">' +
+        '<div class="card-icon">\ud83d\udebd</div><div class="card-body">' +
         '<div class="card-name">' + esc(t.n) + '</div>' +
         '<div class="card-sub">' + (t.a ? '<span>' + esc(t.a) + '</span>' : '') + badges.join('') + '</div></div>' +
         '<div class="card-dist">' + formatDist(t.dist) + '<div class="card-walk">' + walkMins(t.dist) + '</div></div></div>';
@@ -396,7 +400,7 @@
     var badges = [];
     if (t.open === true) badges.push('<span class="badge open">Open now</span>');
     if (t.open === false) badges.push('<span class="badge closed">Likely closed</span>');
-    if (t.w) badges.push('<span class="badge ok">♿ Wheelchair accessible</span>');
+    if (t.w) badges.push('<span class="badge ok">\u267f Wheelchair accessible</span>');
     if (t.f === 0) badges.push('<span class="badge">Free to use</span>');
     if (t.f === 1) badges.push('<span class="badge fee">May charge a fee</span>');
     if (t.b) badges.push('<span class="badge">Baby changing</span>');
@@ -409,17 +413,17 @@
     var myRate = state.rates[t.i] || 0;
 
     el.innerHTML =
-      '<button class="back" id="backBtn">← Back to list</button>' +
+      '<button class="back" id="backBtn">\u2190 Back to list</button>' +
       '<h2>' + esc(t.n) + '</h2>' +
-      '<div class="sub">' + (t.a ? esc(t.a) + ' · ' : '') + formatDist(t.dist) + ' · ' + walkMins(t.dist) + '</div>' +
+      '<div class="sub">' + (t.a ? esc(t.a) + ' \u00b7 ' : '') + formatDist(t.dist) + ' \u00b7 ' + walkMins(t.dist) + '</div>' +
       '<div class="actions">' +
         '<a class="btn primary" href="' + maps + '" target="_blank" rel="noopener">Directions</a>' +
-        '<button class="btn' + (isFav ? ' fav-on' : '') + '" type="button" id="favBtn">' + (isFav ? '★ Saved' : '☆ Save') + '</button>' +
+        '<button class="btn' + (isFav ? ' fav-on' : '') + '" type="button" id="favBtn">' + (isFav ? '\u2605 Saved' : '\u2606 Save') + '</button>' +
         '<button class="btn" type="button" id="shareBtn">Share</button>' +
       '</div>' +
       '<div class="tags">' + badges.join('') + '</div>' +
       '<div class="grid">' +
-        '<div class="stat"><div class="stat-l">Distance</div><div class="stat-v">' + (formatDist(t.dist) || '—') + '</div></div>' +
+        '<div class="stat"><div class="stat-l">Distance</div><div class="stat-v">' + (formatDist(t.dist) || '\u2014') + '</div></div>' +
         '<div class="stat"><div class="stat-l">Walk</div><div class="stat-v">' + walkMins(t.dist) + '</div></div>' +
         (t.hours ? '<div class="stat" style="grid-column:1/-1"><div class="stat-l">Hours today</div><div class="stat-v">' + esc(t.hours) + '</div></div>' : '') +
         (t.pay ? '<div class="stat" style="grid-column:1/-1"><div class="stat-l">Payment</div><div class="stat-v">' + esc(t.pay) + '</div></div>' : '') +
@@ -427,10 +431,10 @@
       (t.note ? '<div class="note">' + esc(t.note) + '</div>' : '') +
       '<div class="rate"><span style="font-size:.85rem;color:var(--muted)">Your rating:</span>' +
         [1,2,3,4,5].map(function (n) {
-          return '<button type="button" data-r="' + n + '" class="' + (myRate >= n ? 'on' : '') + '">★</button>';
+          return '<button type="button" data-r="' + n + '" class="' + (myRate >= n ? 'on' : '') + '">\u2605</button>';
         }).join('') + '</div>' +
       '<a class="btn" href="' + tm + '" target="_blank" rel="noopener" style="margin-bottom:8px">View / report on Toilet Map</a>' +
-      '<div class="credit">Contains data from the <a href="https://www.toiletmap.org.uk/dataset" target="_blank" rel="noopener">Toilet Map</a> © Public Convenience Ltd — <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a>. Location stays on your device.</div>';
+      '<div class="credit">Contains data from the <a href="https://www.toiletmap.org.uk/dataset" target="_blank" rel="noopener">Toilet Map</a> \u00a9 Public Convenience Ltd \u2014 <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a>. Location stays on your device.</div>';
     el.classList.add('open');
 
     $('backBtn').onclick = function () {
@@ -449,7 +453,7 @@
       applyList();
     };
     $('shareBtn').onclick = async function () {
-      var data = { title: t.n, text: t.n + (t.a ? ' — ' + t.a : ''), url: 'https://www.google.com/maps?q=' + t.lat + ',' + t.lng };
+      var data = { title: t.n, text: t.n + (t.a ? ' \u2014 ' + t.a : ''), url: 'https://www.google.com/maps?q=' + t.lat + ',' + t.lng };
       try {
         if (navigator.share) await navigator.share(data);
         else { await navigator.clipboard.writeText(data.text + '\n' + data.url); toast('Link copied'); }
@@ -459,7 +463,7 @@
       btn.onclick = function () {
         state.rates[t.i] = +btn.dataset.r;
         saveJson(LS_RATE, state.rates);
-        toast('Rated ' + btn.dataset.r + '★ (saved on this device)');
+        toast('Rated ' + btn.dataset.r + '\u2605 (saved on this device)');
         showDetail(t);
       };
     });
@@ -478,7 +482,7 @@
     state.searchLock = false;
     state.locating = true;
     $('locateBtn').classList.add('active');
-    toast('Finding your location…');
+    toast('Finding your location\u2026');
     navigator.geolocation.getCurrentPosition(
       function (pos) {
         state.locating = false;
@@ -507,7 +511,7 @@
 
   async function searchPlace(q) {
     if (!q || q.length < 2) return;
-    toast('Searching…');
+    toast('Searching\u2026');
     state.searchLock = true;
     try {
       var url = 'https://nominatim.openstreetmap.org/search?format=json&countrycodes=gb&q=' + encodeURIComponent(q) + '&limit=1';
@@ -523,7 +527,7 @@
       var btn = $('searchAreaBtn');
       if (btn) btn.hidden = true;
       toast(data[0].display_name.split(',').slice(0, 2).join(','));
-    } catch (e) { toast('Search failed — check connection'); }
+    } catch (e) { toast('Search failed \u2014 check connection'); }
   }
 
   function searchThisArea() {
@@ -596,13 +600,12 @@
 
   window.addEventListener('online', function () {
     state.offline = false;
-    $('offlineBanner').hidden = true;
+    if ($('offlineBanner')) $('offlineBanner').hidden = true;
     toast('Back online');
-    refreshNearby();
   });
   window.addEventListener('offline', function () {
     state.offline = true;
-    $('offlineBanner').hidden = false;
+    if ($('offlineBanner')) $('offlineBanner').hidden = false;
   });
 
   applyTheme();
@@ -610,16 +613,16 @@
   loadData()
     .then(function () {
       $('splash').classList.add('hide');
-      toast('Connected to Toilet Map');
+      toast((state.static && state.static.length ? state.static.length.toLocaleString() + ' toilets ready' : 'Ready'));
       if (navigator.geolocation) locate();
       else refreshNearby();
     })
     .catch(function (err) {
       $('splash').innerHTML =
-        '<div style="font-size:2.5rem">📡</div>' +
-        '<h1 style="font-size:1.2rem;margin-top:12px">Couldn’t load data</h1>' +
+        '<div style="font-size:2.5rem">\ud83d\udce1</div>' +
+        '<h1 style="font-size:1.2rem;margin-top:12px">Couldn\u2019t load data</h1>' +
         '<p style="color:var(--muted);max-width:280px;text-align:center;margin-top:8px;line-height:1.45">' +
-        'The Toilet Map server did not respond in time. Check your connection — we will keep trying if you tap below.</p>' +
+        'Could not download the toilet dataset. Check your connection and try again.</p>' +
         '<p style="color:var(--muted);font-size:.75rem;margin-top:6px">' + esc(err && err.message ? err.message : 'Failed to fetch') + '</p>' +
         '<button class="btn primary" style="margin-top:16px;width:100%;max-width:220px;box-sizing:border-box" id="retryBtn">Try again</button>';
       var btn = document.getElementById('retryBtn');
