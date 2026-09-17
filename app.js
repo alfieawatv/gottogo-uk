@@ -1,15 +1,1 @@
-(async function () {
-  try {
-    var parts = [];
-    for (var i = 0; i < 6; i++) {
-      var r = await fetch('./c' + i + '.txt?v=1');
-      if (!r.ok) throw new Error('chunk ' + i + ' HTTP ' + r.status);
-      parts.push(await r.text());
-    }
-    var code = atob(parts.join(''));
-    (0, eval)(code);
-  } catch (e) {
-    console.error(e);
-    document.body.innerHTML = '<div style="padding:2rem;font-family:system-ui;text-align:center"><h1>Could not load</h1><p>Please refresh. ' + (e && e.message ? e.message : '') + '</p></div>';
-  }
-})();
+(function(){document.body.innerHTML='<div style="padding:2rem;font-family:system-ui;max-width:480px;margin:2rem auto"><h1>Got to Go</h1><p>Temporary maintenance while the full app is restored. Please open the previous working Vercel deployment or check GitHub in a few minutes.</p><p><a href="https://www.toiletmap.org.uk">Toilet Map</a> still works for finding toilets.</p></div>';})();
