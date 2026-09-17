@@ -573,24 +573,108 @@
     );
   }
 
-  async function searchPlace(q) {
-    if (!q || q.length < 2) return;
-    toast('Searching\u2026');
+  function hideSuggest() {
+    var box = $('searchSuggest');
+    if (!box) return;
+    box.classList.remove('open');
+    box.hidden = true;
+    box.innerHTML = '';
+  }
+
+  function showSuggest(items) {
+    var box = $('searchSuggest');
+    if (!box) return;
+    if (!items || !items.length) { hideSuggest(); return; }
+    box.hidden = false;
+    box.classList.add('open');
+    box.innerHTML = items.map(function (it, idx) {
+      var parts = (it.display_name || '').split(',');
+      var main = parts[0] ? parts[0].trim() : 'Place';
+      var sub = parts.slice(1, 4).map(function (s) { return s.trim(); }).join(', ');
+      return '<button type="button" role="option" data-i="' + idx + '">' +
+        '<span class="suggest-main">' + esc(main) + '</span>' +
+        (sub ? '<span class="suggest-sub">' + esc(sub) + '</span>' : '') +
+        '</button>';
+    }).join('');
+    box._items = items;
+    box.querySelectorAll('button').forEach(function (btn) {
+      btn.onclick = function () {
+        var it = box._items[+btn.dataset.i];
+        if (it) pickPlace(it);
+      };
+    });
+  }
+
+  async function pickPlace(it) {
+    hideSuggest();
     state.searchLock = true;
+    var lat = parseFloat(it.lat), lng = parseFloat(it.lon);
+    state.focusLat = lat;
+    state.focusLng = lng;
+    var label = (it.display_name || '').split(',').slice(0, 2).join(',').trim();
+    if ($('search')) $('search').value = label;
+    $('searchBox').classList.add('has-value');
+    state.map.setView([lat, lng], 13);
+    if (state.radiusKm < 8) { $('radius').value = '10'; state.radiusKm = 10; localStorage.setItem(LS_RAD, '10'); }
+    toast('Searching near ' + label + '\u2026');
     try {
-      var url = 'https://nominatim.openstreetmap.org/search?format=json&countrycodes=gb&q=' + encodeURIComponent(q) + '&limit=1';
-      var res = await fetch(url, { headers: { 'Accept-Language': 'en', 'User-Agent': 'GotToGo/3.0' } });
-      var data = await res.json();
-      if (!data.length) { toast('No place found in the UK'); return; }
-      var lat = parseFloat(data[0].lat), lng = parseFloat(data[0].lon);
-      state.focusLat = lat;
-      state.focusLng = lng;
-      state.map.setView([lat, lng], 13);
-      if (state.radiusKm < 8) { $('radius').value = '10'; state.radiusKm = 10; localStorage.setItem(LS_RAD, '10'); }
       await refreshNearby();
       var btn = $('searchAreaBtn');
       if (btn) btn.hidden = true;
-      toast(data[0].display_name.split(',').slice(0, 2).join(','));
+      toast(label);
+    } catch (e) {
+      toast('Could not load toilets for that place');
+    }
+  }
+
+  var suggestTimer = null;
+  var lastSuggestQ = '';
+
+  async function fetchSuggestions(q) {
+    if (!q || q.length < 2) { hideSuggest(); return; }
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+      toast('No signal \u2014 connect to search');
+      hideSuggest();
+      return;
+    }
+    lastSuggestQ = q;
+    try {
+      var url = 'https://nominatim.openstreetmap.org/search?format=json&countrycodes=gb&addressdetails=0&q=' +
+        encodeURIComponent(q) + '&limit=6';
+      var res = await fetch(url, { headers: { 'Accept-Language': 'en', 'User-Agent': 'GotToGo/3.1' } });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      var data = await res.json();
+      if (lastSuggestQ !== q) return;
+      if (!data.length) {
+        hideSuggest();
+        toast('No matching places');
+        return;
+      }
+      showSuggest(data);
+    } catch (e) {
+      hideSuggest();
+      toast('Search failed \u2014 check connection');
+    }
+  }
+
+  async function searchPlace(q) {
+    if (!q || q.length < 2) return;
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+      toast('No signal \u2014 connect to search');
+      return;
+    }
+    toast('Searching\u2026');
+    try {
+      var url = 'https://nominatim.openstreetmap.org/search?format=json&countrycodes=gb&q=' + encodeURIComponent(q) + '&limit=6';
+      var res = await fetch(url, { headers: { 'Accept-Language': 'en', 'User-Agent': 'GotToGo/3.1' } });
+      var data = await res.json();
+      if (!data.length) { toast('No place found in the UK'); hideSuggest(); return; }
+      if (data.length === 1) {
+        await pickPlace(data[0]);
+      } else {
+        showSuggest(data);
+        toast('Pick a place from the list');
+      }
     } catch (e) { toast('Search failed \u2014 check connection'); }
   }
 
@@ -668,14 +752,28 @@
   };
   var searchInput = $('search');
   searchInput.addEventListener('keydown', function (e) {
-    if (e.key === 'Enter') { e.preventDefault(); searchPlace(searchInput.value.trim()); }
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      clearTimeout(suggestTimer);
+      searchPlace(searchInput.value.trim());
+    } else if (e.key === 'Escape') {
+      hideSuggest();
+    }
   });
   searchInput.addEventListener('input', function () {
     $('searchBox').classList.toggle('has-value', searchInput.value.length > 0);
+    clearTimeout(suggestTimer);
+    var q = searchInput.value.trim();
+    if (q.length < 2) { hideSuggest(); return; }
+    suggestTimer = setTimeout(function () { fetchSuggestions(q); }, 350);
+  });
+  searchInput.addEventListener('blur', function () {
+    setTimeout(hideSuggest, 180);
   });
   $('searchClear').onclick = function () {
     searchInput.value = '';
     $('searchBox').classList.remove('has-value');
+    hideSuggest();
     searchInput.focus();
   };
   $('expandBtn').onclick = cyclePanel;
@@ -723,11 +821,21 @@
   window.addEventListener('online', function () {
     state.offline = false;
     if ($('offlineBanner')) $('offlineBanner').hidden = true;
-    toast('Back online');
+    toast('Back online \u2014 refreshing\u2026');
+    var splash = $('splash');
+    var failedSplash = splash && !splash.classList.contains('hide');
+    if (failedSplash) {
+      setTimeout(function () { location.reload(); }, 600);
+      return;
+    }
+    if (state.map) {
+      refreshNearby().catch(function () {});
+    }
   });
   window.addEventListener('offline', function () {
     state.offline = true;
     if ($('offlineBanner')) $('offlineBanner').hidden = false;
+    toast('No signal');
   });
 
   applyTheme();
