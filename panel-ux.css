@@ -1,0 +1,82 @@
+/* Panel interaction & no-overlap rules (mobile + general) */
+
+/* Keep results panel above map chrome so handle is never covered */
+.panel {
+  z-index: 20;
+}
+
+/* Search this area sits under the panel when expanded */
+.search-area {
+  z-index: 14;
+}
+
+/* When list is expanded: hide Search this area so it cannot cover the handle */
+body.panel-expanded .search-area {
+  display: none !important;
+}
+
+/* Larger, easier-to-grab minimize handle */
+.handle {
+  width: 56px;
+  height: 6px;
+  margin: 8px auto 2px;
+  background: var(--muted);
+  opacity: 0.55;
+  border-radius: 999px;
+  position: relative;
+  /* invisible expanded hit area */
+  touch-action: none;
+  cursor: grab;
+}
+.handle::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 120px;
+  height: 44px; /* finger-sized target */
+}
+.handle:active {
+  opacity: 0.9;
+  cursor: grabbing;
+}
+
+/* Panel header actions: easier to press Shrink / About */
+.panel-actions .mini-btn {
+  min-height: 36px;
+  min-width: 64px;
+  padding: 8px 12px;
+  font-size: 0.8rem;
+}
+
+/* Expanded: leave a clear strip under the header so handle stays usable */
+@media (max-width: 859px) {
+  .panel.expanded {
+    max-height: min(72vh, calc(100dvh - 120px));
+  }
+
+  /* FABs sit above the panel, never on the handle */
+  body.panel-expanded .fab-stack {
+    bottom: calc(min(72vh, calc(100dvh - 120px)) + 12px) !important;
+  }
+  body.panel-mid .fab-stack {
+    bottom: calc(38vh + 12px) !important;
+  }
+  body.panel-collapsed .fab-stack {
+    bottom: calc(76px + 12px) !important;
+  }
+
+  /* Slightly stronger panel top edge so drag affordance is obvious */
+  .panel {
+    border-top: 1px solid var(--border);
+    box-shadow: 0 -8px 28px rgba(0, 0, 0, 0.35);
+  }
+}
+
+/* Desktop: no handle issues */
+@media (min-width: 860px) {
+  body.panel-expanded .search-area {
+    display: block !important;
+  }
+}
