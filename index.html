@@ -49,6 +49,9 @@
           <div class="search-suggest" id="searchSuggest" role="listbox" hidden></div>
         </div>
         <button class="btn-icon" id="themeBtn" title="Toggle theme" aria-label="Theme">◐</button>
+        <button class="btn-icon" id="settingsBtn" title="Settings" aria-label="Settings">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="3"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+        </button>
         <button class="btn-icon" id="locateBtn" title="My location" aria-label="My location">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
         </button>
@@ -107,11 +110,44 @@
       </div>
     </div>
   </div>
+  <div class="modal" id="settingsModal" hidden>
+    <div class="modal-card settings-card">
+      <div class="settings-head">
+        <h2>Settings</h2>
+        <button type="button" class="btn-icon" id="settingsClose" aria-label="Close">✕</button>
+      </div>
+      <section class="settings-section">
+        <h3>Location</h3>
+        <p class="settings-desc" id="locStatus">Checking location permission…</p>
+        <button type="button" class="btn primary" id="settingsLocateBtn" style="width:100%;margin-top:10px">Allow location again</button>
+        <p class="settings-hint">If you previously tapped Block / Don’t Allow, phones hide the prompt. Use this button to try again, or enable location in your browser settings.</p>
+      </section>
+      <section class="settings-section">
+        <h3>Distance units</h3>
+        <p class="settings-desc">Choose how distances are shown on the map and in the toilet list (for example 500 m vs 1,640 ft).</p>
+        <div class="units-row">
+          <button type="button" class="unit-btn active" data-units="metric">
+            <strong>Metric</strong>
+            <span>Metres and kilometres (m, km) — standard in the UK</span>
+          </button>
+          <button type="button" class="unit-btn" data-units="imperial">
+            <strong>Imperial</strong>
+            <span>Feet and miles (ft, mi)</span>
+          </button>
+        </div>
+      </section>
+      <section class="settings-section">
+        <h3>Appearance</h3>
+        <p class="settings-desc">Use the ◐ button in the header to switch light and dark mode. Your choice is saved on this device.</p>
+      </section>
+      <p class="settings-footer">Created by Alfie Watts</p>
+    </div>
+  </div>
   <div class="toast" id="toast"></div>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
   <script src="app.js"></script>
-  <!-- Vercel Web Analytics (for static HTML sites — not Next.js) -->
+  <script src="settings-overlay.js"></script>
   <script>
     window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };
   </script>
