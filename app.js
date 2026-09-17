@@ -55,8 +55,17 @@
   }
 
   function walkMins(m) {
-    if (m == null) return '';
-    return '~' + Math.max(1, Math.round(m / 83.3)) + ' min walk';
+    if (m == null || isNaN(m)) return '';
+    // Straight-line underestimates real walking (roads/crossings).
+    // ~1.25 path factor + 4.5 km/h (75 m/min) urban pace.
+    var pathM = m * 1.25;
+    var mins = Math.round(pathM / 75);
+    if (mins < 1) return '< 1 min walk';
+    if (mins === 1) return '~1 min walk';
+    if (mins < 60) return '~' + mins + ' min walk';
+    var h = Math.floor(mins / 60);
+    var r = mins % 60;
+    return r ? '~' + h + ' h ' + r + ' min walk' : '~' + h + ' h walk';
   }
 
   function esc(s) {
