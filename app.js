@@ -54,10 +54,15 @@
     return (m / 1000).toFixed(m < 10000 ? 1 : 0) + ' km';
   }
 
+  // Prefer distance from the user when GPS is known (even if list is for a searched area)
+  function displayDist(t) {
+    if (!t) return null;
+    if (t.userDist != null && !isNaN(t.userDist)) return t.userDist;
+    return t.dist;
+  }
+
   function walkMins(m) {
     if (m == null || isNaN(m)) return '';
-    // Straight-line underestimates real walking (roads/crossings).
-    // ~1.25 path factor + 4.5 km/h (75 m/min) urban pace.
     var pathM = m * 1.25;
     var mins = Math.round(pathM / 75);
     if (mins < 1) return '< 1 min walk';
@@ -365,11 +370,15 @@
           var t = state.static[i];
           var d = haversine(lat, lng, t.lat, t.lng);
           if (d <= max) {
+            var ud = null;
+            if (state.userLat != null && state.userLng != null) {
+              ud = haversine(state.userLat, state.userLng, t.lat, t.lng);
+            }
             items.push({
               i: t.i, n: t.n, a: t.a, lat: t.lat, lng: t.lng,
               w: t.w, f: t.f, b: t.b, r: t.r, g: t.g,
               note: t.note || null, pay: t.pay || null,
-              ot: t.ot || null, open: t.open, hours: t.hours, dist: d
+              ot: t.ot || null, open: t.open, hours: t.hours, dist: d, userDist: ud
             });
           }
         }
@@ -378,7 +387,13 @@
         for (var j = 0; j < live.length; j++) {
           var t2 = live[j];
           var d2 = haversine(lat, lng, t2.lat, t2.lng);
-          if (d2 <= max) { t2.dist = d2; items.push(t2); }
+          if (d2 <= max) {
+            t2.dist = d2;
+            t2.userDist = (state.userLat != null && state.userLng != null)
+              ? haversine(state.userLat, state.userLng, t2.lat, t2.lng)
+              : null;
+            items.push(t2);
+          }
         }
         if (live.length && !state.static.length) state.static = live;
       }
@@ -409,8 +424,10 @@
   function renderList() {
     var el = $('list');
     var n = state.nearby.length;
-    var where = (state.focusLat != null && state.userLat != null && Math.abs(state.focusLat - state.userLat) < 1e-8) ? 'of you' : (state.focusLat != null ? 'of search' : 'of map centre');
-    $('meta').textContent = n ? (n + ' within ' + state.radiusKm + ' km ' + where) : ('No matches within ' + state.radiusKm + ' km');
+    var ofYou = state.focusLat != null && state.userLat != null && Math.abs(state.focusLat - state.userLat) < 1e-8 && Math.abs(state.focusLng - state.userLng) < 1e-8;
+    var where = ofYou ? 'of you' : (state.focusLat != null ? 'of search' : 'of map centre');
+    var extra = (!ofYou && state.userLat != null) ? ' \u00b7 walk times from you' : '';
+    $('meta').textContent = n ? (n + ' within ' + state.radiusKm + ' km ' + where + extra) : ('No matches within ' + state.radiusKm + ' km');
     if (!n) {
       el.innerHTML = '<div class="empty"><div class="emoji">\ud83d\udd0d</div><h3>Nothing nearby</h3><p>Try a larger radius, clear filters,<br/>or search a town / postcode.</p><div style="margin-top:16px;display:flex;justify-content:center"><button class="btn primary" style="width:auto;min-width:140px;max-width:200px;padding:12px 24px;flex:0 0 auto" id="emptyRadius">Set radius 10 km</button></div></div>';
       var b = document.getElementById('emptyRadius');
@@ -431,7 +448,7 @@
         '<div class="card-icon">\ud83d\udebd</div><div class="card-body">' +
         '<div class="card-name">' + esc(t.n) + '</div>' +
         '<div class="card-sub">' + (t.a ? '<span>' + esc(t.a) + '</span>' : '') + badges.join('') + '</div></div>' +
-        '<div class="card-dist">' + formatDist(t.dist) + '<div class="card-walk">' + walkMins(t.dist) + '</div></div></div>';
+        '<div class="card-dist">' + formatDist(displayDist(t)) + '<div class="card-walk">' + walkMins(displayDist(t)) + '</div></div></div>';
     }).join('');
     el.querySelectorAll('.card').forEach(function (card) {
       card.onclick = function () { select(card.dataset.id); };
@@ -447,7 +464,7 @@
     for (var i = 0; i < items.length; i++) {
       var t = items[i];
       var m = L.marker([t.lat, t.lng], { icon: pinIcon(state.selected === t.i), title: t.n });
-      m.bindPopup('<strong>' + esc(t.n) + '</strong><br/><span style="color:#94a3b8;font-size:12px">' + esc(t.a || '') + '</span><br/><span style="color:#2dd4bf;font-weight:600">' + formatDist(t.dist) + '</span>');
+      m.bindPopup('<strong>' + esc(t.n) + '</strong><br/><span style="color:#94a3b8;font-size:12px">' + esc(t.a || '') + '</span><br/><span style="color:#2dd4bf;font-weight:600">' + formatDist(displayDist(t)) + '</span>');
       (function (id) { m.on('click', function () { select(id, false); }); })(t.i);
       state.cluster.addLayer(m);
       state.markers.set(t.i, m);
@@ -488,7 +505,7 @@
     el.innerHTML =
       '<button class="back" id="backBtn">\u2190 Back to list</button>' +
       '<h2>' + esc(t.n) + '</h2>' +
-      '<div class="sub">' + (t.a ? esc(t.a) + ' \u00b7 ' : '') + formatDist(t.dist) + ' \u00b7 ' + walkMins(t.dist) + '</div>' +
+      '<div class="sub">' + (t.a ? esc(t.a) + ' \u00b7 ' : '') + formatDist(displayDist(t)) + ' \u00b7 ' + walkMins(displayDist(t)) + '</div>' +
       '<div class="actions">' +
         '<a class="btn primary" href="' + maps + '" target="_blank" rel="noopener">Directions</a>' +
         '<button class="btn' + (isFav ? ' fav-on' : '') + '" type="button" id="favBtn">' + (isFav ? '\u2605 Saved' : '\u2606 Save') + '</button>' +
@@ -496,8 +513,8 @@
       '</div>' +
       '<div class="tags">' + badges.join('') + '</div>' +
       '<div class="grid">' +
-        '<div class="stat"><div class="stat-l">Distance</div><div class="stat-v">' + (formatDist(t.dist) || '\u2014') + '</div></div>' +
-        '<div class="stat"><div class="stat-l">Walk</div><div class="stat-v">' + walkMins(t.dist) + '</div></div>' +
+        '<div class="stat"><div class="stat-l">Distance</div><div class="stat-v">' + (formatDist(displayDist(t)) || '\u2014') + '</div></div>' +
+        '<div class="stat"><div class="stat-l">Walk</div><div class="stat-v">' + walkMins(displayDist(t)) + '</div></div>' +
         (t.hours ? '<div class="stat" style="grid-column:1/-1"><div class="stat-l">Hours today</div><div class="stat-v">' + esc(t.hours) + '</div></div>' : '') +
         (t.pay ? '<div class="stat" style="grid-column:1/-1"><div class="stat-l">Payment</div><div class="stat-v">' + esc(t.pay) + '</div></div>' : '') +
       '</div>' +
