@@ -1,1 +1,13 @@
-(function(){document.body.innerHTML='<div style="padding:2rem;font-family:system-ui;max-width:480px;margin:2rem auto"><h1>Got to Go</h1><p>Temporary maintenance while the full app is restored. Please open the previous working Vercel deployment or check GitHub in a few minutes.</p><p><a href="https://www.toiletmap.org.uk">Toilet Map</a> still works for finding toilets.</p></div>';})();
+(function () {
+  var s = document.createElement('script');
+  s.src = 'https://cdn.jsdelivr.net/gh/alfieawatv/gottogo-uk@acdf92859e43e5e4c0efb50b24f9b66ee884c43c/app.js';
+  s.onerror = function () {
+    var s2 = document.createElement('script');
+    s2.src = 'https://raw.githubusercontent.com/alfieawatv/gottogo-uk/acdf92859e43e5e4c0efb50b24f9b66ee884c43c/app.js';
+    s2.onerror = function () {
+      document.body.innerHTML = '<div style="padding:2rem;font-family:system-ui;text-align:center"><h1>Could not load app</h1><p>Please hard-refresh or try again shortly.</p></div>';
+    };
+    document.head.appendChild(s2);
+  };
+  document.head.appendChild(s);
+})();
