@@ -1,0 +1,34 @@
+/* Mobile: full-width search under logo + action buttons */
+@media (max-width: 720px) {
+  .header-row {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .brand {
+    order: 1;
+    margin-right: auto;
+  }
+  .header-row > .btn-icon {
+    order: 2;
+  }
+  .search-box {
+    order: 3;
+    flex: 1 1 100%;
+    width: 100%;
+    min-width: 0;
+  }
+  .search-box input {
+    font-size: 0.92rem;
+    padding-top: 11px;
+    padding-bottom: 11px;
+  }
+}
+@media (max-width: 380px) {
+  .brand {
+    font-size: 0;
+    gap: 0;
+  }
+  .brand-icon {
+    font-size: 16px;
+  }
+}
