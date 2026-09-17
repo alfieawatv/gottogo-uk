@@ -21,8 +21,7 @@
 
   var GQL = 'https://www.toiletmap.org.uk/api';
   var PROXIMITY_QUERY = 'query($from: ProximityInput!) { loosByProximity(from: $from) { id name accessible babyChange radar allGender noPayment notes openingTimes paymentDetails location { lat lng } area { name } } }';
-  var STATIC_URL = 'https://p02w6qqjlqmja4sk.public.blob.vercel-storage.com/exports/toilets-2026-09-16T00%3A00%3A40.869Z-vRPZ3vhRc0EJZy4t6bv7JOCAOqx8UX.json';
-  var STATIC_FALLBACK = './toilets.json';
+  var STATIC_URLS = ['./toilets.json', 'https://gottogo-uk.vercel.app/toilets.json'];
   var staticLoaded = false;
 
   function $(id) { return document.getElementById(id); }
@@ -196,6 +195,7 @@
     var area = '';
     if (Array.isArray(t.areas) && t.areas[0]) area = t.areas[0].name || '';
     else if (Array.isArray(t.area) && t.area[0]) area = t.area[0].name || '';
+    else if (t.area && typeof t.area === 'object' && t.area.name) area = t.area.name || '';
     var ot = t.opening_times || t.openingTimes || null;
     return {
       i: t.id,
@@ -215,37 +215,78 @@
     };
   }
 
+  async function fetchProximity(lat, lng, maxDistance) {
+    maxDistance = maxDistance || 8000;
+    var body = JSON.stringify({
+      query: PROXIMITY_QUERY,
+      variables: { from: { lat: +lat, lng: +lng, maxDistance: +maxDistance } }
+    });
+    var controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    var timer = controller ? setTimeout(function () { try { controller.abort(); } catch (e) {} }, 18000) : null;
+    var res = await fetch(GQL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: body,
+      signal: controller ? controller.signal : undefined
+    });
+    if (timer) clearTimeout(timer);
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    var json = await res.json();
+    if (json.errors && json.errors.length) throw new Error(json.errors[0].message || 'API error');
+    var loos = (json && json.data && json.data.loosByProximity) || [];
+    var list = [];
+    for (var i = 0; i < loos.length; i++) {
+      var n = normalizeRawToilet(loos[i]);
+      if (n) list.push(n);
+    }
+    return list;
+  }
+
   async function loadStatic() {
     setSplashStatus('Loading UK toilet dataset\u2026');
     showSplashSpinner();
-    var urls = [STATIC_URL];
-    if (typeof STATIC_FALLBACK !== 'undefined' && STATIC_FALLBACK) urls.push(STATIC_FALLBACK);
-    var list = null, lastErr = null;
-    for (var u = 0; u < urls.length; u++) {
+    var lastErr = null;
+    for (var u = 0; u < STATIC_URLS.length; u++) {
       try {
-        setSplashStatus(u === 0 ? 'Loading toilet data\u2026' : 'Trying backup source\u2026');
-        var res = await fetch(urls[u], { cache: 'force-cache' });
+        setSplashStatus('Loading toilet data\u2026');
+        var controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+        var timer = controller ? setTimeout(function () { try { controller.abort(); } catch (e) {} }, 20000) : null;
+        var res = await fetch(STATIC_URLS[u], { cache: 'force-cache', signal: controller ? controller.signal : undefined });
+        if (timer) clearTimeout(timer);
         if (!res.ok) throw new Error('HTTP ' + res.status);
         var raw = await res.json();
         if (!Array.isArray(raw) || !raw.length) throw new Error('Empty dataset');
-        list = [];
+        var list = [];
         for (var i = 0; i < raw.length; i++) {
           var n = normalizeRawToilet(raw[i]);
           if (n) list.push(n);
         }
-        if (list.length) break;
+        if (!list.length) throw new Error('Empty dataset');
+        state.static = list;
+        staticLoaded = true;
+        state.all = list;
+        saveJson(LS_CACHE, { at: Date.now(), n: list.length });
+        $('meta').textContent = list.length.toLocaleString() + ' UK toilets loaded';
+        return list;
       } catch (e) {
         lastErr = e;
-        console.warn('Static load failed', urls[u], e);
+        console.warn('Static load failed', STATIC_URLS[u], e);
       }
     }
-    if (!list || !list.length) throw lastErr || new Error('Could not load toilet dataset');
-    state.static = list;
-    staticLoaded = true;
-    state.all = list;
-    saveJson(LS_CACHE, { at: Date.now(), n: list.length });
-    $('meta').textContent = list.length.toLocaleString() + ' UK toilets loaded';
-    return list;
+    try {
+      setSplashStatus('Connecting to live toilet API\u2026');
+      var seed = await fetchProximity(51.5074, -0.1278, 12000);
+      if (seed && seed.length) {
+        state.static = seed;
+        staticLoaded = false;
+        state.all = seed;
+        $('meta').textContent = seed.length + ' toilets (live)';
+        return seed;
+      }
+    } catch (e2) {
+      lastErr = e2;
+    }
+    throw lastErr || new Error('Could not load toilet dataset');
   }
 
   async function loadData() {
@@ -325,24 +366,32 @@
     $('meta').textContent = 'Finding nearby\u2026';
     showSkeletons();
     try {
-      var source = state.static && state.static.length ? state.static : state.all;
-      if (!source || !source.length) {
-        if (!staticLoaded) await loadStatic();
-        source = state.static;
-      }
       var items = [];
-      for (var i = 0; i < source.length; i++) {
-        var t = source[i];
-        var d = haversine(lat, lng, t.lat, t.lng);
-        if (d <= max) {
-          items.push({
-            i: t.i, n: t.n, a: t.a, lat: t.lat, lng: t.lng,
-            w: t.w, f: t.f, b: t.b, r: t.r, g: t.g,
-            note: t.note || null, pay: t.pay || null,
-            ot: t.ot || null, open: t.open, hours: t.hours,
-            dist: d
-          });
+      if (staticLoaded && state.static && state.static.length > 500) {
+        for (var i = 0; i < state.static.length; i++) {
+          var t = state.static[i];
+          var d = haversine(lat, lng, t.lat, t.lng);
+          if (d <= max) {
+            items.push({
+              i: t.i, n: t.n, a: t.a, lat: t.lat, lng: t.lng,
+              w: t.w, f: t.f, b: t.b, r: t.r, g: t.g,
+              note: t.note || null, pay: t.pay || null,
+              ot: t.ot || null, open: t.open, hours: t.hours,
+              dist: d
+            });
+          }
         }
+      } else {
+        var live = await fetchProximity(lat, lng, Math.max(max, 3000));
+        for (var j = 0; j < live.length; j++) {
+          var t2 = live[j];
+          var d2 = haversine(lat, lng, t2.lat, t2.lng);
+          if (d2 <= max) {
+            t2.dist = d2;
+            items.push(t2);
+          }
+        }
+        if (live.length && !state.static.length) state.static = live;
       }
       items.sort(function (a, b) { return a.dist - b.dist; });
       state.all = items;
