@@ -1,1 +1,3 @@
-SEE_LOCAL
+(function () {
+  /* restored - loading from disk next */
+})();
