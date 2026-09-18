@@ -41,7 +41,7 @@
     list.forEach(function (t) {
       var m = L.marker([t.lat, t.lng], { icon: pinIcon(state.selected === t.i) });
       m.bindPopup('<strong>' + esc(t.n) + '</strong><br>' + formatDist(displayDist(t)) +
-        (t.src === 'osm' ? '<br><span style="opacity:.7;font-size:11px">OpenStreetMap</span>' : ''));
+        '<br><span style="opacity:.7;font-size:11px">' + (t.src === 'osm' ? 'OpenStreetMap' : 'Toilet Map') + '</span>');
       m.on('click', function () { selectToilet(t); });
       state.cluster.addLayer(m);
       state.markers.set(t.i, m);
