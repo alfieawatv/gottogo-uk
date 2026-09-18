@@ -24,8 +24,8 @@
   var GQL = 'https://www.toiletmap.org.uk/api';
   var PROXIMITY_QUERY = 'query($from: ProximityInput!) { loosByProximity(from: $from) { id name accessible babyChange radar allGender noPayment notes openingTimes paymentDetails location { lat lng } area { name } } }';
   var OVERPASS_URLS = [
-    'https://overpass-api.de/api/interpreter',
     'https://overpass.kumi.systems/api/interpreter',
+    'https://overpass-api.de/api/interpreter',
     'https://maps.mail.ru/osm/tools/overpass/api/interpreter'
   ];
 
