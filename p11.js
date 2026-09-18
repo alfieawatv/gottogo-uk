@@ -4,8 +4,7 @@
       (t.hours ? '<div class="note">Today: ' + esc(t.hours) + '</div>' : '') +
       (t.notes ? '<div class="note">' + esc(t.notes) + '</div>' : '') +
       '<div class="actions">' + report + '</div>' +
-      '<p class="credit">Created by Alfie Watts \u00b7 Data \u00a9 OpenStreetMap contributors' +
-      (t.src === 'toiletmap' ? ' + Toilet Map (CC BY 4.0)' : '') + '</p>';
+      '<p class="credit">Created by Alfie Watts \u00b7 Full data credits in Settings</p>';
     d.classList.add('open');
     $('detailBack').onclick = function () { d.classList.remove('open'); state.selected = null; applyList(); };
     $('favBtn').onclick = function () {
