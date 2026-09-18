@@ -30,7 +30,7 @@
 
   async function fetchOverpass(lat, lng, radiusM) {
     radiusM = Math.min(Math.max(radiusM, 500), 25000);
-    var q = '[out:json][timeout:30];\n(\n'
+    var q = '[out:json][timeout:12];\n(\n'
       + '  node["amenity"="toilets"](around:' + radiusM + ',' + lat + ',' + lng + ');\n'
       + '  way["amenity"="toilets"](around:' + radiusM + ',' + lat + ',' + lng + ');\n'
       + '  node["toilets"="yes"]["amenity"~"^(pub|bar|restaurant|cafe|fast_food|hotel|fuel|biergarten)$"](around:' + radiusM + ',' + lat + ',' + lng + ');\n'
