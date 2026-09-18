@@ -16,6 +16,7 @@
   function openSettings() {
     var modal = $('settingsModal');
     if (!modal) return;
+    units = localStorage.getItem(LS_UNITS) || 'metric';
     var locStatus = $('locStatus');
     var locBtn = $('settingsLocateBtn');
     function setLocUI(text, mode) {
@@ -66,10 +67,10 @@
     toast('Asking for location\u2026');
     navigator.geolocation.getCurrentPosition(
       function (pos) {
-        toast('Location allowed \u2014 use the locate button to centre the map');
+        toast('Location allowed');
         var locateBtn = $('locateBtn') || $('fabLocate');
         if (locateBtn) locateBtn.click();
-        openSettings();
+        closeSettings();
       },
       function (err) {
         if (err && err.code === 1) {
@@ -89,60 +90,17 @@
     );
   }
 
-  function metricToImperialText(text) {
-    if (!text) return text;
-    var m = text.match(/^([\d.]+)\s*m$/i);
-    if (m) {
-      var feet = parseFloat(m[1]) * 3.28084;
-      if (feet < 1000) return Math.round(feet) + ' ft';
-      return (feet / 5280).toFixed(1) + ' mi';
-    }
-    var k = text.match(/^([\d.]+)\s*km$/i);
-    if (k) {
-      var miles = parseFloat(k[1]) * 0.621371;
-      return miles.toFixed(miles < 10 ? 1 : 0) + ' mi';
-    }
-    return text;
-  }
-
-  function convertTree(root) {
-    if (!root || units !== 'imperial') return;
-    root.querySelectorAll('.card-dist').forEach(function (el) {
-      var walk = el.querySelector('.card-walk');
-      var distText = '';
-      el.childNodes.forEach(function (n) {
-        if (n.nodeType === 3) distText += n.textContent;
-      });
-      distText = distText.trim();
-      if (!distText) return;
-      if (/ft|mi/i.test(distText)) return;
-      var converted = metricToImperialText(distText);
-      var walkHtml = walk ? walk.outerHTML : '';
-      el.innerHTML = converted + walkHtml;
-    });
-    root.querySelectorAll('.stat-v').forEach(function (el) {
-      var t = el.textContent.trim();
-      if (/ft|mi/i.test(t)) return;
-      if (/\d/.test(t) && /(m|km)$/i.test(t)) el.textContent = metricToImperialText(t);
-    });
-  }
-
   function setUnits(u) {
     if (u !== 'metric' && u !== 'imperial') return;
-    units = u;
-    localStorage.setItem(LS_UNITS, u);
-    document.querySelectorAll('[data-units]').forEach(function (btn) {
-      btn.classList.toggle('active', btn.dataset.units === u);
-    });
-    toast(u === 'metric'
-      ? 'Metric: metres and kilometres (m, km) \u2014 standard in the UK'
-      : 'Imperial: feet and miles (ft, mi)');
-    if (u === 'metric') {
-      var r = $('radius');
-      if (r) r.dispatchEvent(new Event('change'));
-    } else {
-      convertTree(document);
+    if (u === (localStorage.getItem(LS_UNITS) || 'metric')) {
+      closeSettings();
+      return;
     }
+    localStorage.setItem(LS_UNITS, u);
+    toast(u === 'metric'
+      ? 'Switching to metric (m, km)\u2026'
+      : 'Switching to imperial (ft, mi)\u2026');
+    setTimeout(function () { location.reload(); }, 400);
   }
 
   function wire() {
@@ -157,21 +115,6 @@
     document.querySelectorAll('[data-units]').forEach(function (btn) {
       btn.onclick = function () { setUnits(btn.dataset.units); };
     });
-
-    var list = $('list');
-    if (list && window.MutationObserver) {
-      var obs = new MutationObserver(function () {
-        if (units === 'imperial') convertTree(list);
-      });
-      obs.observe(list, { childList: true, subtree: true });
-    }
-    var detail = $('detail');
-    if (detail && window.MutationObserver) {
-      var obs2 = new MutationObserver(function () {
-        if (units === 'imperial') convertTree(detail);
-      });
-      obs2.observe(detail, { childList: true, subtree: true });
-    }
   }
 
   if (document.readyState === 'loading') {
