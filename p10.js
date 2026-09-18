@@ -7,9 +7,10 @@
     if (t.open === false) tags += '<span class="badge closed">Closed</span>';
     var maps = 'https://www.openstreetmap.org/directions?to=' + t.lat + '%2C' + t.lng;
     var gmaps = 'https://www.google.com/maps/dir/?api=1&destination=' + t.lat + ',' + t.lng;
-    var report = t.src === 'toiletmap'
-      ? '<a class="btn" href="https://www.toiletmap.org.uk/loos/' + encodeURIComponent(String(t.i).replace(/^uk-/, '')) + '" target="_blank" rel="noopener">Report on TM</a>'
-      : '<a class="btn" href="https://www.openstreetmap.org/node/' + encodeURIComponent(String(t.i).replace(/^osm-node-/, '').replace(/^osm-way-/, '')) + '" target="_blank" rel="noopener">View on OSM</a>';
+    var reportHref = t.src === 'toiletmap'
+      ? 'https://www.toiletmap.org.uk/loos/' + encodeURIComponent(String(t.i).replace(/^uk-/, ''))
+      : 'https://www.openstreetmap.org/' + (String(t.i).indexOf('osm-way-') === 0 ? 'way/' : 'node/') + encodeURIComponent(String(t.i).replace(/^osm-node-/, '').replace(/^osm-way-/, ''));
+    var report = '<a class="btn" href="' + reportHref + '" target="_blank" rel="noopener">Report</a>';
     d.innerHTML =
       '<button type="button" class="back" id="detailBack">\u2190 Back</button>' +
       '<h2>' + esc(t.n) + '</h2>' +
