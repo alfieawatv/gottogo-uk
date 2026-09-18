@@ -1,13 +1,17 @@
 (function () {
-  var s = document.createElement('script');
-  s.src = 'https://cdn.jsdelivr.net/gh/alfieawatv/gottogo-uk@acdf92859e43e5e4c0efb50b24f9b66ee884c43c/app.js';
-  s.onerror = function () {
-    var s2 = document.createElement('script');
-    s2.src = 'https://raw.githubusercontent.com/alfieawatv/gottogo-uk/acdf92859e43e5e4c0efb50b24f9b66ee884c43c/app.js';
-    s2.onerror = function () {
-      document.body.innerHTML = '<div style="padding:2rem;font-family:system-ui;text-align:center"><h1>Could not load app</h1><p>Please hard-refresh or try again shortly.</p></div>';
-    };
-    document.head.appendChild(s2);
-  };
-  document.head.appendChild(s);
+  function fail(e) {
+    console.error(e);
+    document.body.innerHTML = '<div style="padding:2rem;font-family:system-ui;text-align:center"><h1>Could not load app</h1><p>Please refresh.</p></div>';
+  }
+  var n = 19;
+  var files = [];
+  for (var i = 0; i < n; i++) files.push('./p' + i + '.js?v=w4');
+  Promise.all(files.map(function (u) {
+    return fetch(u).then(function (r) {
+      if (!r.ok) throw new Error(u + ' ' + r.status);
+      return r.text();
+    });
+  })).then(function (parts) {
+    (0, eval)(parts.join(''));
+  }).catch(fail);
 })();
