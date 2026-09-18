@@ -7,21 +7,21 @@
   <meta name="theme-color" content="#0f1623" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black" />
-  <meta name="description" content="Find public toilets near you in the UK. Free map with accessible toilets, baby change, RADAR keys and open-now info." />
-  <meta name="keywords" content="toilet near me, public toilets UK, toilet map, find a toilet, accessible toilet, RADAR toilet, baby changing" />
-  <meta property="og:title" content="Got to Go – Find toilets near you in the UK" />
-  <meta property="og:description" content="Free UK toilet finder. See public toilets near you, filter by accessible, free, baby change and RADAR." />
+  <meta name="description" content="Find public toilets near you worldwide. Map of public toilets, accessible toilets, baby change, and places that may let you use the loo." />
+  <meta name="keywords" content="toilet near me, public toilets, toilet map, find a toilet, accessible toilet, OpenStreetMap toilets, RADAR toilet, baby changing" />
+  <meta property="og:title" content="Got to Go – Find toilets near you" />
+  <meta property="og:description" content="Free toilet finder worldwide. Public toilets, accessible, free, baby change — powered by OpenStreetMap." />
   <meta property="og:type" content="website" />
   <meta property="og:url" content="https://gottogo.app/" />
   <meta property="og:site_name" content="Got to Go" />
   <meta name="twitter:card" content="summary" />
-  <meta name="twitter:title" content="Got to Go – Find toilets near you in the UK" />
-  <meta name="twitter:description" content="Free UK toilet finder map. Accessible, free, baby change, RADAR." />
+  <meta name="twitter:title" content="Got to Go – Find toilets near you" />
+  <meta name="twitter:description" content="Free worldwide toilet finder map. OpenStreetMap + UK Toilet Map." />
   <link rel="canonical" href="https://gottogo.app/" />
   <link rel="manifest" href="manifest.json" />
   <link rel="icon" href="icon.svg" type="image/svg+xml" />
   <link rel="apple-touch-icon" href="icon.svg" />
-  <title>Got to Go – Find toilets near you in the UK</title>
+  <title>Got to Go – Find toilets near you</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -36,7 +36,7 @@
   <div class="splash" id="splash">
     <div class="splash-logo">🚽</div>
     <h1>Got <span>to</span> Go</h1>
-    <p>UK public toilet finder</p>
+    <p>Find toilets near you — worldwide</p>
     <div class="splash-bar"><i></i></div>
   </div>
   <div id="offlineBanner" class="offline-banner" hidden>You’re offline — showing cached results</div>
@@ -46,7 +46,7 @@
         <div class="brand"><div class="brand-icon">🚽</div>Got <span>to</span> Go</div>
         <div class="search-box" id="searchBox">
           <svg class="s-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
-          <input id="search" type="search" placeholder="Town or postcode…" autocomplete="off" enterkeyhint="search" />
+          <input id="search" type="search" placeholder="City or place…" autocomplete="off" enterkeyhint="search" />
           <button type="button" class="clear" id="searchClear" aria-label="Clear">✕</button>
           <div class="search-suggest" id="searchSuggest" role="listbox" hidden></div>
         </div>
@@ -102,11 +102,12 @@
       <div class="modal" id="aboutModal" hidden>
         <div class="modal-card">
           <h2>About Got to Go</h2>
-          <p>Find public toilets across the UK using live data from the <a href="https://www.toiletmap.org.uk" target="_blank" rel="noopener">Toilet Map</a>.</p>
+          <p>Find public toilets <strong>worldwide</strong> using <a href="https://www.openstreetmap.org" target="_blank" rel="noopener">OpenStreetMap</a>, plus UK detail from the <a href="https://www.toiletmap.org.uk" target="_blank" rel="noopener">Toilet Map</a>.</p>
+          <p>Also shows pubs, restaurants, cafés and similar places that may let you use the toilet when mapped on OSM.</p>
           <p><strong>Privacy:</strong> Your location stays on your device. We don’t upload GPS coordinates to our servers.</p>
-          <p><strong>Data:</strong> Contains data from the Toilet Map © Public Convenience Ltd — <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a>.</p>
-          <p><strong>Tips:</strong> Save favourites with ★. Use filters for accessible, free, RADAR, and open-now toilets.</p>
-          <p class="muted">Ratings are stored only on this device. Report wrong info via Toilet Map on each toilet’s page.</p>
+          <p><strong>Data:</strong> © OpenStreetMap contributors. UK data also from Toilet Map © Public Convenience Ltd — <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a>. Duplicates are merged so each place appears once.</p>
+          <p><strong>Tips:</strong> Save favourites with ★. Use filters and Settings for units and location permission.</p>
+          <p class="muted">Created by Alfie Watts</p>
           <button class="btn primary" id="aboutClose" type="button">Close</button>
         </div>
       </div>
