@@ -1,26 +1,75 @@
+  function loadCachedPos() {
+    try {
+      var o = JSON.parse(localStorage.getItem('g2g_lastpos') || 'null');
+      if (!o || o.lat == null || o.lng == null || !o.t) return null;
+      if (Date.now() - o.t > 24 * 60 * 60 * 1000) return null;
+      return o;
+    } catch (e) { return null; }
+  }
+  function savePos(lat, lng) {
+    try { localStorage.setItem('g2g_lastpos', JSON.stringify({ lat: lat, lng: lng, t: Date.now() })); } catch (e) {}
+  }
+
+  function applyPosition(lat, lng, opts) {
+    opts = opts || {};
+    state.userLat = lat;
+    state.userLng = lng;
+    if (!opts.keepSearchLock) state.searchLock = false;
+    state.focusLat = lat;
+    state.focusLng = lng;
+    setUser(lat, lng);
+    if (!opts.noMap) state.map.setView([lat, lng], 14);
+    savePos(lat, lng);
+    if (!opts.noRefresh) refreshNearby();
+  }
+
   function locateUser(force) {
+    if (!force) {
+      var cached = loadCachedPos();
+      if (cached) {
+        applyPosition(cached.lat, cached.lng);
+        if (navigator.permissions && navigator.permissions.query) {
+          navigator.permissions.query({ name: 'geolocation' }).then(function (r) {
+            if (r.state === 'granted') {
+              navigator.geolocation.getCurrentPosition(function (pos) {
+                applyPosition(pos.coords.latitude, pos.coords.longitude, { noMap: true });
+              }, function () {}, { enableHighAccuracy: false, maximumAge: 600000, timeout: 8000 });
+            }
+          }).catch(function () {});
+        }
+        return;
+      }
+      if (navigator.permissions && navigator.permissions.query) {
+        navigator.permissions.query({ name: 'geolocation' }).then(function (r) {
+          if (r.state === 'granted') doGeo(false);
+          else {
+            goTo(51.5074, -0.1278, 'London');
+            toast('Tap locate to use your location');
+          }
+        }).catch(function () { doGeo(false); });
+        return;
+      }
+    }
+    doGeo(!!force);
+  }
+
+  function doGeo(showToast) {
     if (!navigator.geolocation) {
       toast('Location not supported');
+      if (state.focusLat == null) goTo(51.5074, -0.1278, 'London');
       return;
     }
     state.locating = true;
-    toast('Finding you\u2026');
+    if (showToast) toast('Finding you\u2026');
     navigator.geolocation.getCurrentPosition(function (pos) {
       state.locating = false;
-      state.userLat = pos.coords.latitude;
-      state.userLng = pos.coords.longitude;
-      state.searchLock = false;
-      state.focusLat = state.userLat;
-      state.focusLng = state.userLng;
-      setUser(state.userLat, state.userLng);
-      state.map.setView([state.userLat, state.userLng], 14);
-      refreshNearby();
+      applyPosition(pos.coords.latitude, pos.coords.longitude);
     }, function (err) {
       state.locating = false;
       if (err.code === 1) toast('Location blocked — open Settings to allow it');
-      else toast('Could not get location');
+      else if (showToast) toast('Could not get location');
       if (state.focusLat == null) goTo(51.5074, -0.1278, 'London');
-    }, { enableHighAccuracy: true, timeout: 12000, maximumAge: force ? 0 : 60000 });
+    }, { enableHighAccuracy: !!showToast, timeout: 12000, maximumAge: showToast ? 0 : 300000 });
   }
 
   function setPanelMode(mode) {
