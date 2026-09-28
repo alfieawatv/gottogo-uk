@@ -25,8 +25,9 @@
   var PROXIMITY_QUERY = 'query($from: ProximityInput!) { loosByProximity(from: $from) { id name accessible babyChange radar allGender noPayment notes openingTimes paymentDetails location { lat lng } area { name } } }';
   var OVERPASS_URLS = [
     'https://overpass.kumi.systems/api/interpreter',
+    'https://lz4.overpass-api.de/api/interpreter',
     'https://overpass-api.de/api/interpreter',
-    'https://maps.mail.ru/osm/tools/overpass/api/interpreter'
+    '/api/overpass'
   ];
 
   function $(id) { return document.getElementById(id); }
@@ -71,7 +72,7 @@
   }
 
   function esc(s) {
-    return String(s || '').replace(/&/g, '&').replace(/</g, '<').replace(/>/g, '>').replace(/"/g, '"');
+    return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   }
 
   var BAD = /\b(fuck(?:ing|ed|er|s)?|shit(?:ty|s)?|bollocks|bastard(?:s)?|arse(?:hole)?s?|asshole(?:s)?|cunt(?:s)?|twat(?:s)?|dick(?:head)?s?|cock(?:s)?|piss(?:ing|ed)?|wank(?:er|ing)?s?)\b/gi;
@@ -160,12 +161,8 @@
   }
 
   async function fetchOverpass(lat, lng, radiusM) {
-    radiusM = Math.min(Math.max(radiusM, 400), 15000);
-    var q = '[out:json][timeout:10];\n(\n'
-      + '  node["amenity"="toilets"](around:' + radiusM + ',' + lat + ',' + lng + ');\n'
-      + '  way["amenity"="toilets"](around:' + radiusM + ',' + lat + ',' + lng + ');\n'
-      + '  node["toilets"="yes"]["amenity"~"^(pub|bar|restaurant|cafe|fast_food|hotel|fuel)$"](around:' + radiusM + ',' + lat + ',' + lng + ');\n'
-      + ');\nout center tags;';
+    radiusM = Math.min(Math.max(radiusM, 400), 10000);
+    var q = '[out:json][timeout:6];node["amenity"="toilets"](around:' + radiusM + ',' + lat + ',' + lng + ');out tags;';
     var body = 'data=' + encodeURIComponent(q);
     var lastErr = null;
     function one(url) {
