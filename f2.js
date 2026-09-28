@@ -7,6 +7,9 @@
         '<div class="card-sub">' + badges + '</div></div>' +
         '<div class="card-dist">' + formatDist(dd) + '<div class="card-walk">' + walkMins(dd) + '</div></div></div>';
     }).join('');
+    if (state.closestPad) {
+      el.innerHTML += '<div class="list-hint" style="padding:12px 16px 16px;font-size:13px;line-height:1.45;opacity:.8;text-align:center">Change your distance setting to see more toilets.</div>';
+    }
     el.querySelectorAll('.card').forEach(function (card) {
       card.onclick = function () {
         var t = state.nearby.find(function (x) { return x.i === card.dataset.id; });
