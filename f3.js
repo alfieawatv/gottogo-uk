@@ -2,7 +2,7 @@
     try {
       var o = JSON.parse(localStorage.getItem('g2g_lastpos') || 'null');
       if (!o || o.lat == null || o.lng == null || !o.t) return null;
-      if (Date.now() - o.t > 24 * 60 * 60 * 1000) return null;
+      if (Date.now() - o.t > 7 * 24 * 60 * 60 * 1000) return null;
       return o;
     } catch (e) { return null; }
   }
@@ -24,33 +24,46 @@
   }
 
   function locateUser(force) {
-    if (!force) {
-      var cached = loadCachedPos();
-      if (cached) {
-        applyPosition(cached.lat, cached.lng);
-        if (navigator.permissions && navigator.permissions.query) {
-          navigator.permissions.query({ name: 'geolocation' }).then(function (r) {
-            if (r.state === 'granted') {
-              navigator.geolocation.getCurrentPosition(function (pos) {
-                applyPosition(pos.coords.latitude, pos.coords.longitude, { noMap: true });
-              }, function () {}, { enableHighAccuracy: false, maximumAge: 600000, timeout: 8000 });
-            }
-          }).catch(function () {});
-        }
-        return;
-      }
-      if (navigator.permissions && navigator.permissions.query) {
-        navigator.permissions.query({ name: 'geolocation' }).then(function (r) {
-          if (r.state === 'granted') doGeo(false);
-          else {
-            goTo(51.5074, -0.1278, 'London');
-            toast('Tap locate to use your location');
-          }
-        }).catch(function () { doGeo(false); });
-        return;
-      }
+    if (force) {
+      doGeo(true);
+      return;
     }
-    doGeo(!!force);
+
+    var cached = loadCachedPos();
+
+    function silentRefresh() {
+      if (!navigator.geolocation) return;
+      navigator.geolocation.getCurrentPosition(function (pos) {
+        applyPosition(pos.coords.latitude, pos.coords.longitude, { noMap: true });
+      }, function () {}, { enableHighAccuracy: false, maximumAge: 600000, timeout: 10000 });
+    }
+
+    if (cached) {
+      applyPosition(cached.lat, cached.lng);
+    }
+
+    if (navigator.permissions && navigator.permissions.query) {
+      navigator.permissions.query({ name: 'geolocation' }).then(function (r) {
+        if (r.state === 'granted') {
+          if (cached) silentRefresh();
+          else doGeo(false);
+        } else if (r.state === 'prompt') {
+          doGeo(true);
+        } else {
+          if (!cached) {
+            goTo(51.5074, -0.1278, 'London');
+            toast('Location blocked — open Settings to allow it');
+          }
+        }
+      }).catch(function () {
+        if (cached) silentRefresh();
+        else doGeo(true);
+      });
+      return;
+    }
+
+    if (cached) silentRefresh();
+    else doGeo(true);
   }
 
   function doGeo(showToast) {
