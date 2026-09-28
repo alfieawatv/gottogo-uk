@@ -267,3 +267,4 @@
       if (t.fee) badges += '<span class="badge fee">Fee</span>';
       if (t.b) badges += '<span class="badge info">Baby</span>';
       if (t.r) badges += '<span class="badge info">RADAR</span>';
+      if (t.chain) badges += '<span class="badge info">Customer toilet</span>';
