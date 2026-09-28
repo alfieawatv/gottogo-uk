@@ -160,7 +160,7 @@
   }
 
   async function fetchOverpass(lat, lng, radiusM) {
-    radiusM = Math.min(Math.max(radiusM, 300), 5000);
+    radiusM = Math.min(Math.max(radiusM, 300), 25000);
     try {
       var apiUrl = '/api/overpass?lat=' + encodeURIComponent(lat.toFixed(4)) +
         '&lng=' + encodeURIComponent(lng.toFixed(4)) +
