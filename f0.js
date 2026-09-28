@@ -71,7 +71,7 @@
   }
 
   function esc(s) {
-    return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    return String(s || '').replace(/&/g, '&').replace(/</g, '<').replace(/>/g, '>').replace(/"/g, '"');
   }
 
   var BAD = /\b(fuck(?:ing|ed|er|s)?|shit(?:ty|s)?|bollocks|bastard(?:s)?|arse(?:hole)?s?|asshole(?:s)?|cunt(?:s)?|twat(?:s)?|dick(?:head)?s?|cock(?:s)?|piss(?:ing|ed)?|wank(?:er|ing)?s?)\b/gi;
@@ -160,22 +160,40 @@
   }
 
   async function fetchOverpass(lat, lng, radiusM) {
-    radiusM = Math.min(Math.max(radiusM, 300), 8000);
-    var q = '[out:json][timeout:5][maxsize:16777216];node["amenity"="toilets"](around:' +
+    radiusM = Math.min(Math.max(radiusM, 300), 5000);
+    try {
+      var apiUrl = '/api/overpass?lat=' + encodeURIComponent(lat.toFixed(4)) +
+        '&lng=' + encodeURIComponent(lng.toFixed(4)) +
+        '&r=' + encodeURIComponent(String(Math.round(radiusM)));
+      var ctrl = typeof AbortController !== 'undefined' ? new AbortController() : null;
+      var t = ctrl ? setTimeout(function () { try { ctrl.abort(); } catch (e) {} }, 7000) : null;
+      var opts = {};
+      if (ctrl) opts.signal = ctrl.signal;
+      var res = await fetch(apiUrl, opts);
+      if (t) clearTimeout(t);
+      if (res.ok) {
+        var data = await res.json();
+        if (data && data.elements) {
+          return (data.elements || []).map(normalizeOsm).filter(Boolean);
+        }
+      }
+    } catch (e) {}
+
+    var q = '[out:json][timeout:5];node["amenity"="toilets"](around:' +
       Math.round(radiusM) + ',' + lat.toFixed(5) + ',' + lng.toFixed(5) + ');out tags;';
     var body = 'data=' + encodeURIComponent(q);
     var lastErr = null;
     function tryOne(url) {
-      var ctrl = typeof AbortController !== 'undefined' ? new AbortController() : null;
-      var t = ctrl ? setTimeout(function () { try { ctrl.abort(); } catch (e) {} }, 4500) : null;
-      var opts = {
+      var ctrl2 = typeof AbortController !== 'undefined' ? new AbortController() : null;
+      var t2 = ctrl2 ? setTimeout(function () { try { ctrl2.abort(); } catch (e) {} }, 4000) : null;
+      var o = {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: body
       };
-      if (ctrl) opts.signal = ctrl.signal;
-      return fetch(url, opts).then(function (res) {
-        if (t) clearTimeout(t);
+      if (ctrl2) o.signal = ctrl2.signal;
+      return fetch(url, o).then(function (res) {
+        if (t2) clearTimeout(t2);
         if (!res.ok) throw new Error('HTTP ' + res.status);
         return res.json();
       }).then(function (data) {
@@ -183,16 +201,8 @@
       });
     }
     for (var i = 0; i < OVERPASS_URLS.length; i++) {
-      try {
-        return await tryOne(OVERPASS_URLS[i]);
-      } catch (err) {
-        lastErr = err;
-      }
-    }
-    try {
-      return await tryOne('/api/overpass');
-    } catch (err) {
-      lastErr = err;
+      try { return await tryOne(OVERPASS_URLS[i]); }
+      catch (err) { lastErr = err; }
     }
     throw lastErr || new Error('Overpass failed');
   }
