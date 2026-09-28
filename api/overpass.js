@@ -26,7 +26,7 @@ module.exports = async function handler(req, res) {
       return res.end(JSON.stringify({ error: 'lat and lng required' }));
     }
     if (isNaN(r) || r < 300) r = 1500;
-    if (r > 8000) r = 8000;
+    if (r > 25000) r = 25000;
     lat = Math.round(lat * 500) / 500;
     lng = Math.round(lng * 500) / 500;
     r = Math.round(r / 250) * 250;
