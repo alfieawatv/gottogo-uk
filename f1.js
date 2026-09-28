@@ -41,21 +41,34 @@
   }
 
   function cacheKey(lat, lng, rad) {
-    return 'g2g_c_' + lat.toFixed(3) + '_' + lng.toFixed(3) + '_' + rad;
+    return 'g2g_c_' + lat.toFixed(2) + '_' + lng.toFixed(2) + '_' + rad;
   }
   function readCache(lat, lng, rad) {
     try {
-      var raw = localStorage.getItem(cacheKey(lat, lng, rad)) || sessionStorage.getItem(cacheKey(lat, lng, rad));
-      var o = JSON.parse(raw || 'null');
-      if (!o || !o.t || Date.now() - o.t > 30 * 60 * 1000) return null;
-      return o.list || null;
+      var keys = [cacheKey(lat, lng, rad)];
+      var d = 0.02;
+      keys.push(cacheKey(lat + d, lng, rad));
+      keys.push(cacheKey(lat - d, lng, rad));
+      keys.push(cacheKey(lat, lng + d, rad));
+      keys.push(cacheKey(lat, lng - d, rad));
+      var best = null;
+      for (var i = 0; i < keys.length; i++) {
+        var raw = localStorage.getItem(keys[i]) || sessionStorage.getItem(keys[i]);
+        if (!raw) continue;
+        var o = JSON.parse(raw);
+        if (!o || !o.t || !o.list || !o.list.length) continue;
+        if (Date.now() - o.t > 2 * 60 * 60 * 1000) continue;
+        if (!best || o.t > best.t) best = o;
+      }
+      return best;
     } catch (e) { return null; }
   }
   function writeCache(lat, lng, rad, list) {
     try {
-      var payload = JSON.stringify({ t: Date.now(), list: list });
-      sessionStorage.setItem(cacheKey(lat, lng, rad), payload);
-      localStorage.setItem(cacheKey(lat, lng, rad), payload);
+      var payload = JSON.stringify({ t: Date.now(), list: list, lat: lat, lng: lng });
+      var k = cacheKey(lat, lng, rad);
+      sessionStorage.setItem(k, payload);
+      localStorage.setItem(k, payload);
     } catch (e) {}
   }
 
@@ -63,9 +76,15 @@
     if (state.focusLat == null || state.focusLng == null) return;
     var lat = state.focusLat, lng = state.focusLng;
     var cached = readCache(lat, lng, state.radiusKm);
-    if (cached && cached.length) {
-      state.all = cached;
+    var haveCache = cached && cached.list && cached.list.length;
+    if (haveCache) {
+      state.all = cached.list;
       applyList();
+      if (Date.now() - cached.t < 10 * 60 * 1000) {
+        state.loading = false;
+        return;
+      }
+      state.loading = false;
     } else {
       state.loading = true;
       showListLoading();
@@ -76,8 +95,8 @@
       pending--;
       if (pending <= 0) {
         state.loading = false;
-        writeCache(lat, lng, state.radiusKm, state.all);
-        if (!state.all.length) toast('No toilets found here — try a larger radius');
+        if (state.all && state.all.length) writeCache(lat, lng, state.radiusKm, state.all);
+        if (!state.all.length && !haveCache) toast('No toilets found here — try a larger radius');
       }
     }
     function ingest(list) {
@@ -86,7 +105,11 @@
       applyList();
     }
     fetchOverpass(lat, lng, state.radiusKm * 1000).then(function (list) {
-      ingest(list);
+      if (list && list.length) {
+        if (!haveCache) state.all = list;
+        else state.all = mergeToilets([list, state.all || []]);
+        applyList();
+      }
       done();
     }).catch(function (e) {
       console.error(e);
