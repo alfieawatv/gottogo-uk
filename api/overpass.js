@@ -30,9 +30,17 @@ module.exports = async function handler(req, res) {
     lat = Math.round(lat * 500) / 500;
     lng = Math.round(lng * 500) / 500;
     r = Math.round(r / 250) * 250;
+    var around = '(around:' + r + ',' + lat + ',' + lng + ')';
     var ql =
-      '[out:json][timeout:5][maxsize:16777216];' +
-      'node["amenity"="toilets"](around:' + r + ',' + lat + ',' + lng + ');out tags;';
+      '[out:json][timeout:8][maxsize:33554432];(' +
+      'node["amenity"="toilets"]["access"!="private"]["access"!="no"]' + around + ';' +
+      'node["amenity"="fast_food"]["brand"~"McDonald|KFC|Burger King|Subway|Wendy|Taco Bell|Pizza Hut|Domino|Nando|Greggs|Five Guys|Chipotle|Tim Horton",i]' + around + ';' +
+      'node["amenity"="cafe"]["brand"~"Starbucks|Costa|Pret|Greggs|Nero|Tim Horton",i]' + around + ';' +
+      'node["amenity"="fast_food"]["name"~"McDonald|KFC|Burger King|Subway|Wendy|Nando|Greggs",i]' + around + ';' +
+      'node["amenity"="pub"]["toilets"="yes"]' + around + ';' +
+      'node["amenity"="restaurant"]["toilets"="yes"]' + around + ';' +
+      'node["amenity"="fuel"]["toilets"="yes"]' + around + ';' +
+      ');out tags;';
     payload = 'data=' + encodeURIComponent(ql);
   } else if (req.method === 'POST') {
     var body = req.body;
@@ -59,7 +67,7 @@ module.exports = async function handler(req, res) {
   for (var i = 0; i < urls.length; i++) {
     try {
       var ctrl = typeof AbortController !== 'undefined' ? new AbortController() : null;
-      var timer = ctrl ? setTimeout(function () { try { ctrl.abort(); } catch (e) {} }, 6000) : null;
+      var timer = ctrl ? setTimeout(function () { try { ctrl.abort(); } catch (e) {} }, 9000) : null;
       var opts = {
         method: 'POST',
         headers: {
