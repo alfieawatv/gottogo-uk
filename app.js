@@ -5,7 +5,7 @@
   }
   var n = 4;
   var files = [];
-  for (var i = 0; i < n; i++) files.push('./f' + i + '.js?v=s4');
+  for (var i = 0; i < n; i++) files.push('./f' + i + '.js?v=s5');
   Promise.all(files.map(function (u) {
     return fetch(u).then(function (r) {
       if (!r.ok) throw new Error(u + ' ' + r.status);
