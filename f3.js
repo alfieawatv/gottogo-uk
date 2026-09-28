@@ -228,6 +228,21 @@
     if (s) s.classList.add('hide');
   }
 
+  try {
+    var keys = [];
+    for (var i = 0; i < localStorage.length; i++) {
+      var k = localStorage.key(i);
+      if (k && (k.indexOf('g2g_c_') === 0 || k.indexOf('g2g_c2_') === 0 || k.indexOf('g2g_c3_') === 0)) keys.push(k);
+    }
+    keys.forEach(function (k) { localStorage.removeItem(k); });
+    keys = [];
+    for (var j = 0; j < sessionStorage.length; j++) {
+      var k2 = sessionStorage.key(j);
+      if (k2 && (k2.indexOf('g2g_c_') === 0 || k2.indexOf('g2g_c2_') === 0 || k2.indexOf('g2g_c3_') === 0)) keys.push(k2);
+    }
+    keys.forEach(function (k) { sessionStorage.removeItem(k); });
+  } catch (e) {}
+
   initMap();
   wire();
   setTimeout(hideSplash, 400);
