@@ -135,10 +135,16 @@
     if (tags.toilets === 'no') return true;
     if (tags['access:toilet'] === 'private' || tags['toilet:access'] === 'private') return true;
     var n = String(name || tags.name || tags['name:en'] || '').toLowerCase();
-    if (/\b(shit\s*house|shithouse|poop|turd|fart|pee\s*pee|my house|my home|private house|someone'?s house|test toilet|dummy|xxx)\b/i.test(n)) return true;
+    if (/(crap|shit|shithouse|poop|turd|fart|piss\s*house|pee\s*pee|my house|my home|private house|someone'?s house|test toilet|dummy|xxx|asdf|lmao|haha|lol toilet)/i.test(n)) return true;
     if ((tags.building === 'house' || tags.building === 'residential' || tags.building === 'apartments') &&
         tags.amenity === 'toilets' && !tags.operator && !tags.brand && !tags.network) return true;
     return false;
+  }
+
+  function isNameJunk(name) {
+    var n = String(name || '').toLowerCase();
+    if (!n) return false;
+    return /(crap|shit|shithouse|poop|turd|fart|piss\s*house|pee\s*pee|my house|my home|private house|test toilet|dummy|xxx|asdf|lmao|haha)/i.test(n);
   }
 
   function isChainPlace(tags) {
