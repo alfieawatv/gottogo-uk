@@ -6,9 +6,8 @@
       if (url.indexOf('/api/') === 0) {
         return orig.call(this, input, init);
       }
-      if (url.indexOf('overpass') !== -1 || url.indexOf('interpreter') !== -1) {
-        return orig.call(this, '/api/overpass', init || {});
-      }
+      // Do NOT rewrite Overpass — client races several mirrors for speed.
+      // School networks can still use /api/overpass when the app calls it directly.
       if (url.indexOf('toiletmap.org.uk') !== -1) {
         return orig.call(this, '/api/tm', init || {}).catch(function () {
           return orig.call(this, input, init);
