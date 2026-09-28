@@ -104,7 +104,7 @@
       state.all = mergeToilets([state.all || [], list]);
       applyList();
     }
-    fetchOverpass(lat, lng, state.radiusKm * 1000).then(function (list) {
+    fetchOverpass(lat, lng, Math.max(state.radiusKm, 20) * 1000).then(function (list) {
       if (list && list.length) {
         if (!haveCache) state.all = list;
         else state.all = mergeToilets([list, state.all || []]);
@@ -117,7 +117,7 @@
       if (!state.all.length) showListError(e);
     });
     if (inUK(lat, lng)) {
-      fetchUkToiletMap(lat, lng, state.radiusKm).then(function (list) {
+      fetchUkToiletMap(lat, lng, Math.max(state.radiusKm, 20)).then(function (list) {
         ingest(list);
         done();
       }).catch(function () { done(); });
@@ -210,22 +210,33 @@
   function applyList() {
     var lat = state.focusLat, lng = state.focusLng;
     var max = state.radiusKm * 1000;
-    var list = state.all.map(function (t) {
+    var scored = (state.all || []).map(function (t) {
       var o = Object.assign({}, t);
       o.dist = haversine(lat, lng, t.lat, t.lng);
       if (state.userLat != null) o.userDist = haversine(state.userLat, state.userLng, t.lat, t.lng);
       else o.userDist = null;
       return o;
-    }).filter(function (t) { return t.dist <= max; });
-    var f = state.filter;
-    if (f === 'accessible') list = list.filter(function (t) { return t.a; });
-    else if (f === 'free') list = list.filter(function (t) { return t.free; });
-    else if (f === 'baby') list = list.filter(function (t) { return t.b; });
-    else if (f === 'radar') list = list.filter(function (t) { return t.r; });
-    else if (f === 'gender') list = list.filter(function (t) { return t.g; });
-    else if (f === 'open') list = list.filter(function (t) { return t.open === true; });
-    else if (f === 'fav') list = list.filter(function (t) { return state.favs[t.i]; });
-    list.sort(function (a, b) { return a.dist - b.dist; });
+    });
+    function passFilter(t) {
+      var f = state.filter;
+      if (f === 'accessible') return !!t.a;
+      if (f === 'free') return !!t.free;
+      if (f === 'baby') return !!t.b;
+      if (f === 'radar') return !!t.r;
+      if (f === 'gender') return !!t.g;
+      if (f === 'open') return t.open === true;
+      if (f === 'fav') return !!state.favs[t.i];
+      return true;
+    }
+    scored = scored.filter(passFilter);
+    scored.sort(function (a, b) { return a.dist - b.dist; });
+    var within = scored.filter(function (t) { return t.dist <= max; });
+    var list = within;
+    state.closestPad = false;
+    if (list.length < 5 && scored.length > list.length) {
+      list = scored.slice(0, 5);
+      state.closestPad = true;
+    }
     state.nearby = list;
     renderMarkers(list);
     renderList(list);
@@ -239,7 +250,10 @@
     var radLabel = state.units === 'imperial'
       ? (state.radiusKm * 0.621371).toFixed(1) + ' mi'
       : state.radiusKm + ' km';
-    if (meta) meta.textContent = list.length + ' within ' + radLabel + ' ' + where;
+    if (meta) {
+      if (state.closestPad) meta.textContent = 'Closest ' + list.length + ' ' + where + ' (beyond ' + radLabel + ')';
+      else meta.textContent = list.length + ' within ' + radLabel + ' ' + where;
+    }
     if (!list.length) {
       el.innerHTML = '<div class="empty"><div class="emoji">\ud83d\udebd</div><h3>No matches within ' + radLabel + '</h3><p>Try a larger radius or Search this area.</p></div>';
       return;
