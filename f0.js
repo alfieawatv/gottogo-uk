@@ -26,8 +26,7 @@
   var OVERPASS_URLS = [
     'https://overpass.kumi.systems/api/interpreter',
     'https://lz4.overpass-api.de/api/interpreter',
-    'https://overpass-api.de/api/interpreter',
-    '/api/overpass'
+    'https://overpass-api.de/api/interpreter'
   ];
 
   function $(id) { return document.getElementById(id); }
@@ -161,27 +160,39 @@
   }
 
   async function fetchOverpass(lat, lng, radiusM) {
-    radiusM = Math.min(Math.max(radiusM, 400), 10000);
-    var q = '[out:json][timeout:6];node["amenity"="toilets"](around:' + radiusM + ',' + lat + ',' + lng + ');out tags;';
+    radiusM = Math.min(Math.max(radiusM, 300), 8000);
+    var q = '[out:json][timeout:5][maxsize:16777216];node["amenity"="toilets"](around:' +
+      Math.round(radiusM) + ',' + lat.toFixed(5) + ',' + lng.toFixed(5) + ');out tags;';
     var body = 'data=' + encodeURIComponent(q);
     var lastErr = null;
-    function one(url) {
-      return fetch(url, {
+    function tryOne(url) {
+      var ctrl = typeof AbortController !== 'undefined' ? new AbortController() : null;
+      var t = ctrl ? setTimeout(function () { try { ctrl.abort(); } catch (e) {} }, 4500) : null;
+      var opts = {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: body
-      }).then(function (res) {
+      };
+      if (ctrl) opts.signal = ctrl.signal;
+      return fetch(url, opts).then(function (res) {
+        if (t) clearTimeout(t);
         if (!res.ok) throw new Error('HTTP ' + res.status);
         return res.json();
       }).then(function (data) {
         return (data.elements || []).map(normalizeOsm).filter(Boolean);
       });
     }
-    if (typeof Promise.any === 'function') {
-      try { return await Promise.any(OVERPASS_URLS.map(one)); } catch (e) { lastErr = e; }
-    }
     for (var i = 0; i < OVERPASS_URLS.length; i++) {
-      try { return await one(OVERPASS_URLS[i]); } catch (err) { lastErr = err; }
+      try {
+        return await tryOne(OVERPASS_URLS[i]);
+      } catch (err) {
+        lastErr = err;
+      }
+    }
+    try {
+      return await tryOne('/api/overpass');
+    } catch (err) {
+      lastErr = err;
     }
     throw lastErr || new Error('Overpass failed');
   }
