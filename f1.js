@@ -45,14 +45,17 @@
   }
   function readCache(lat, lng, rad) {
     try {
-      var o = JSON.parse(sessionStorage.getItem(cacheKey(lat, lng, rad)) || 'null');
-      if (!o || !o.t || Date.now() - o.t > 300000) return null;
+      var raw = localStorage.getItem(cacheKey(lat, lng, rad)) || sessionStorage.getItem(cacheKey(lat, lng, rad));
+      var o = JSON.parse(raw || 'null');
+      if (!o || !o.t || Date.now() - o.t > 30 * 60 * 1000) return null;
       return o.list || null;
     } catch (e) { return null; }
   }
   function writeCache(lat, lng, rad, list) {
     try {
-      sessionStorage.setItem(cacheKey(lat, lng, rad), JSON.stringify({ t: Date.now(), list: list }));
+      var payload = JSON.stringify({ t: Date.now(), list: list });
+      sessionStorage.setItem(cacheKey(lat, lng, rad), payload);
+      localStorage.setItem(cacheKey(lat, lng, rad), payload);
     } catch (e) {}
   }
 
