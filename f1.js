@@ -41,7 +41,7 @@
   }
 
   function cacheKey(lat, lng, rad) {
-    return 'g2g_c_' + lat.toFixed(2) + '_' + lng.toFixed(2) + '_' + rad;
+    return 'g2g_c3_' + lat.toFixed(2) + '_' + lng.toFixed(2) + '_' + rad;
   }
   function readCache(lat, lng, rad) {
     try {
@@ -101,11 +101,14 @@
     }
     function ingest(list) {
       if (!list || !list.length) return;
+      list = list.filter(function (t) { return !(typeof isNameJunk === 'function' && isNameJunk(t.n)); });
+      if (!list.length) return;
       state.all = mergeToilets([state.all || [], list]);
       applyList();
     }
     fetchOverpass(lat, lng, Math.max(state.radiusKm, 20) * 1000).then(function (list) {
       if (list && list.length) {
+        list = list.filter(function (t) { return !(typeof isNameJunk === 'function' && isNameJunk(t.n)); });
         if (!haveCache) state.all = list;
         else state.all = mergeToilets([list, state.all || []]);
         applyList();
@@ -228,7 +231,10 @@
       if (f === 'fav') return !!state.favs[t.i];
       return true;
     }
-    scored = scored.filter(passFilter);
+    scored = scored.filter(function (t) {
+      if (typeof isNameJunk === 'function' && isNameJunk(t.n)) return false;
+      return passFilter(t);
+    });
     scored.sort(function (a, b) { return a.dist - b.dist; });
     var within = scored.filter(function (t) { return t.dist <= max; });
     var list = within;
