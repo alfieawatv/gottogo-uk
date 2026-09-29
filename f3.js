@@ -23,6 +23,13 @@
     if (!opts.noRefresh) refreshNearby();
   }
 
+  function isIOSDevice() {
+    var ua = navigator.userAgent || '';
+    if (/iPad|iPhone|iPod/.test(ua)) return true;
+    if (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1) return true;
+    return false;
+  }
+
   function locateUser(force) {
     if (force) {
       doGeo(true);
@@ -35,35 +42,48 @@
       if (!navigator.geolocation) return;
       navigator.geolocation.getCurrentPosition(function (pos) {
         applyPosition(pos.coords.latitude, pos.coords.longitude, { noMap: true });
-      }, function () {}, { enableHighAccuracy: false, maximumAge: 600000, timeout: 10000 });
+      }, function () {}, { enableHighAccuracy: false, maximumAge: 600000, timeout: 15000 });
     }
 
     if (cached) {
       applyPosition(cached.lat, cached.lng);
     }
 
-    if (navigator.permissions && navigator.permissions.query) {
-      navigator.permissions.query({ name: 'geolocation' }).then(function (r) {
-        if (r.state === 'granted') {
-          if (cached) silentRefresh();
-          else doGeo(false);
-        } else if (r.state === 'prompt') {
-          doGeo(true);
-        } else {
-          if (!cached) {
-            goTo(51.5074, -0.1278, 'London');
-            toast('Location blocked — open Settings to allow it');
-          }
-        }
-      }).catch(function () {
-        if (cached) silentRefresh();
-        else doGeo(true);
-      });
+    // iPhone/iPad: Permissions API is unreliable — always call getCurrentPosition
+    // so Safari can show the Allow Location dialog on first use.
+    if (isIOSDevice() || !navigator.permissions || !navigator.permissions.query) {
+      doGeo(!cached);
       return;
     }
 
-    if (cached) silentRefresh();
-    else doGeo(true);
+    var settled = false;
+    var timer = setTimeout(function () {
+      if (settled) return;
+      settled = true;
+      doGeo(!cached);
+    }, 1200);
+
+    navigator.permissions.query({ name: 'geolocation' }).then(function (r) {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      if (r.state === 'granted') {
+        if (cached) silentRefresh();
+        else doGeo(false);
+      } else if (r.state === 'prompt') {
+        doGeo(true);
+      } else {
+        if (!cached) {
+          goTo(51.5074, -0.1278, 'London');
+          toast('Location blocked — open Settings to allow it');
+        }
+      }
+    }).catch(function () {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      doGeo(!cached);
+    });
   }
 
   function doGeo(showToast) {
@@ -73,16 +93,26 @@
       return;
     }
     state.locating = true;
-    if (showToast) toast('Finding you\u2026');
+    if (showToast) toast('Allow location to find toilets near you');
     navigator.geolocation.getCurrentPosition(function (pos) {
       state.locating = false;
       applyPosition(pos.coords.latitude, pos.coords.longitude);
     }, function (err) {
       state.locating = false;
-      if (err.code === 1) toast('Location blocked — open Settings to allow it');
-      else if (showToast) toast('Could not get location');
-      if (state.focusLat == null) goTo(51.5074, -0.1278, 'London');
-    }, { enableHighAccuracy: !!showToast, timeout: 12000, maximumAge: showToast ? 0 : 300000 });
+      if (err.code === 1) {
+        toast('Location blocked — open Settings → allow location');
+        if (state.focusLat == null) goTo(51.5074, -0.1278, 'London');
+      } else if (showToast) {
+        toast('Could not get location — try the locate button');
+        if (state.focusLat == null) goTo(51.5074, -0.1278, 'London');
+      } else if (state.focusLat == null) {
+        goTo(51.5074, -0.1278, 'London');
+      }
+    }, {
+      enableHighAccuracy: isIOSDevice() ? true : !!showToast,
+      timeout: isIOSDevice() ? 20000 : 12000,
+      maximumAge: showToast ? 0 : 300000
+    });
   }
 
   function setPanelMode(mode) {
@@ -246,7 +276,7 @@
   initMap();
   wire();
   setTimeout(hideSplash, 400);
-  locateUser(false);
+  setTimeout(function () { locateUser(false); }, 500);
 
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('./sw.js').catch(function () {});
