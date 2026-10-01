@@ -1,4 +1,4 @@
-const CACHE = 'gottogo-v8';
+const CACHE = 'gottogo-v9';
 const ASSETS = [
   './', './index.html', './app.js', './styles.css', './manifest.json', './icon.svg',
   './settings-overlay.js', './mobile-search.css', './panel-ux.css',
