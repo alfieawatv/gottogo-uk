@@ -27,8 +27,9 @@ module.exports = async function handler(req, res) {
     }
     if (isNaN(r) || r < 300) r = 1500;
     if (r > 25000) r = 25000;
-    lat = Math.round(lat * 500) / 500;
-    lng = Math.round(lng * 500) / 500;
+    // Coarser grid (~400m) so more users share one CDN cache entry
+    lat = Math.round(lat * 250) / 250;
+    lng = Math.round(lng * 250) / 250;
     r = Math.round(r / 250) * 250;
     var around = '(around:' + r + ',' + lat + ',' + lng + ')';
     var ql =
@@ -88,10 +89,10 @@ module.exports = async function handler(req, res) {
       res.setHeader('Content-Type', 'application/json; charset=utf-8');
       res.setHeader(
         'Cache-Control',
-        'public, s-maxage=1800, max-age=300, stale-while-revalidate=3600'
+        'public, s-maxage=7200, max-age=600, stale-while-revalidate=86400'
       );
-      res.setHeader('CDN-Cache-Control', 'public, s-maxage=1800');
-      res.setHeader('Vercel-CDN-Cache-Control', 'public, s-maxage=1800');
+      res.setHeader('CDN-Cache-Control', 'public, s-maxage=7200');
+      res.setHeader('Vercel-CDN-Cache-Control', 'public, s-maxage=7200');
       return res.end(text);
     } catch (e) {
       lastErr = (e && e.message) || String(e);
