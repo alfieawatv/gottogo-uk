@@ -94,69 +94,144 @@
     }
 
     var nearKm = Math.min(1, state.radiusKm);
-    var fullKm = Math.max(state.radiusKm, 2);
+    var fullKm = Math.max(state.radiusKm, 20);
     var uk = inUK(lat, lng);
     var pending = 1 + (fullKm > nearKm ? 1 : 0) + (uk ? 1 : 0);
-    var bags = [];
 
-    function ingest(list) {
-      bags.push(list || []);
-      var merged = mergeToilets(bags);
-      merged = merged.filter(function (t) {
-        return !(typeof isNameJunk === 'function' && isNameJunk(t.n)) && !(typeof isBlockedId === 'function' && isBlockedId(t.i));
-      });
-      state.all = merged;
-      writeCache(lat, lng, state.radiusKm, merged);
-      applyList();
-    }
-
-    function doneOne() {
+    function done() {
       pending--;
       if (pending <= 0) {
         state.loading = false;
-        if (!state.all.length) applyList();
+        if (state.all && state.all.length) writeCache(lat, lng, state.radiusKm, state.all);
+        if (!state.all.length && !haveCache) toast('No toilets found here — try a larger radius');
       }
     }
+    function clean(list) {
+      return (list || []).filter(function (t) {
+        return t && !(typeof isNameJunk === 'function' && isNameJunk(t.n)) && !(typeof isBlockedId === 'function' && isBlockedId(t.i));
+      });
+    }
+    function ingest(list, replace) {
+      list = clean(list);
+      if (!list.length) return;
+      if (replace && !haveCache) state.all = list;
+      else state.all = mergeToilets([state.all || [], list]);
+      applyList();
+    }
 
-    // Progressive: nearest 1 km first for instant pins
     fetchOverpass(lat, lng, nearKm * 1000).then(function (list) {
-      ingest(list);
-      doneOne();
-    }).catch(function () { doneOne(); });
+      ingest(list, true);
+      done();
+    }).catch(function (e) {
+      console.error(e);
+      done();
+      if (!state.all.length) showListError(e);
+    });
 
     if (fullKm > nearKm) {
       fetchOverpass(lat, lng, fullKm * 1000).then(function (list) {
-        ingest(list);
-        doneOne();
-      }).catch(function () { doneOne(); });
+        ingest(list, false);
+        done();
+      }).catch(function () { done(); });
     }
 
     if (uk) {
-      fetchUkToiletMap(lat, lng, Math.max(fullKm, 5)).then(function (list) {
-        ingest(list);
-        doneOne();
-      }).catch(function () { doneOne(); });
+      fetchUkToiletMap(lat, lng, fullKm).then(function (list) {
+        ingest(list, false);
+        done();
+      }).catch(function () { done(); });
     }
   }
 
   function showListLoading() {
-    var el = $('list');
-    var meta = $('meta');
-    if (meta) meta.textContent = 'Loading nearby toilets\u2026';
-    if (el) el.innerHTML = '<div class="empty"><div class="emoji">\ud83d\udebd</div><h3>Finding toilets</h3><p>Checking closest first\u2026</p></div>';
+    var list = $('list');
+    if (!list) return;
+    list.innerHTML = '<div class="skel"></div><div class="skel"></div><div class="skel"></div>';
+    if ($('meta')) $('meta').textContent = 'Loading toilets\u2026';
+  }
+
+  function showListError(e) {
+    var list = $('list');
+    if (!list) return;
+    var msg = !navigator.onLine ? 'No connection — check Wi\u2011Fi or mobile data' : 'Could not load toilets (map data busy). Try again.';
+    list.innerHTML = '<div class="empty"><div class="emoji">\ud83d\udebd</div><h3>Couldn\u2019t load data</h3><p>' + esc(msg) + '</p>' +
+      '<button type="button" class="btn primary" id="retryBtn">Try again</button></div>';
+    var rb = $('retryBtn');
+    if (rb) rb.onclick = function () { refreshNearby(); };
+    if ($('meta')) $('meta').textContent = 'Error';
+  }
+
+  function initMap() {
+    state.map = L.map('map', { zoomControl: false, attributionControl: true }).setView([20, 0], 2);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>',
+      maxZoom: 19
+    }).addTo(state.map);
+    L.control.zoom({ position: 'bottomright' }).addTo(state.map);
+    state.cluster = L.markerClusterGroup({
+      maxClusterRadius: 48, spiderfyOnMaxZoom: true,
+      showCoverageOnHover: false, disableClusteringAtZoom: 16
+    });
+    state.map.addLayer(state.cluster);
+    var moveTimer;
+    state.map.on('moveend', function () {
+      clearTimeout(moveTimer);
+      moveTimer = setTimeout(function () {
+        var btn = $('searchAreaBtn');
+        if (!btn) return;
+        if (state.focusLat == null) {
+          if (state.map.getZoom() >= 10) btn.hidden = false;
+          return;
+        }
+        var c = state.map.getCenter();
+        var d = haversine(state.focusLat, state.focusLng, c.lat, c.lng);
+        btn.hidden = d < 1200;
+      }, 200);
+    });
+  }
+
+  function pinIcon(selected) {
+    return L.divIcon({
+      className: '',
+      html: '<div class="pin' + (selected ? ' selected' : '') + '"><span>\ud83d\udebd</span></div>',
+      iconSize: [34, 34], iconAnchor: [17, 34], popupAnchor: [0, -30]
+    });
+  }
+
+  function setUser(lat, lng) {
+    if (state.userMarker) state.userMarker.setLatLng([lat, lng]);
+    else {
+      state.userMarker = L.marker([lat, lng], {
+        icon: L.divIcon({ className: '', html: '<div class="me-dot"></div>', iconSize: [18, 18], iconAnchor: [9, 9] }),
+        zIndexOffset: 2000
+      }).addTo(state.map);
+    }
   }
 
   function displayDist(t) {
-    if (t.userDist != null) return t.userDist;
+    if (t.userDist != null && !isNaN(t.userDist)) return t.userDist;
     return t.dist;
   }
 
+  function renderMarkers(list) {
+    state.cluster.clearLayers();
+    state.markers.clear();
+    list.forEach(function (t) {
+      var m = L.marker([t.lat, t.lng], { icon: pinIcon(state.selected === t.i) });
+      m.bindPopup('<strong>' + esc(t.n) + '</strong><br>' + formatDist(displayDist(t)) +
+        '<br><span style="opacity:.7;font-size:11px">' + (t.src === 'osm' ? 'OpenStreetMap' : 'Toilet Map') + '</span>');
+      m.on('click', function () { selectToilet(t); });
+      state.cluster.addLayer(m);
+      state.markers.set(t.i, m);
+    });
+  }
+
   function applyList() {
-    var originLat = state.focusLat, originLng = state.focusLng;
+    var lat = state.focusLat, lng = state.focusLng;
     var max = state.radiusKm * 1000;
     var scored = (state.all || []).map(function (t) {
       var o = Object.assign({}, t);
-      o.dist = haversine(originLat, originLng, t.lat, t.lng);
+      o.dist = haversine(lat, lng, t.lat, t.lng);
       if (state.userLat != null) o.userDist = haversine(state.userLat, state.userLng, t.lat, t.lng);
       else o.userDist = null;
       return o;
