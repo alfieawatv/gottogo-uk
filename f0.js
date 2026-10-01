@@ -23,6 +23,18 @@
 
   var GQL = 'https://www.toiletmap.org.uk/api';
   var PROXIMITY_QUERY = 'query($from: ProximityInput!) { loosByProximity(from: $from) { id name accessible babyChange radar allGender noPayment notes openingTimes paymentDetails location { lat lng } area { name } } }';
+  var g2gBlocklist = { names: [], ids: {} };
+  function loadBlocklist() {
+    fetch('./blocklist.json?v=1').then(function (r) { return r.ok ? r.json() : null; }).then(function (d) {
+      if (!d) return;
+      g2gBlocklist.names = (d.names || []).map(function (n) { return String(n).toLowerCase(); });
+      var ids = {};
+      (d.ids || []).forEach(function (id) { ids[String(id)] = 1; });
+      g2gBlocklist.ids = ids;
+    }).catch(function () {});
+  }
+  loadBlocklist();
+
   var OVERPASS_URLS = [
     'https://overpass.kumi.systems/api/interpreter',
     'https://lz4.overpass-api.de/api/interpreter',
@@ -144,7 +156,16 @@
   function isNameJunk(name) {
     var n = String(name || '').toLowerCase();
     if (!n) return false;
+    if (g2gBlocklist.names && g2gBlocklist.names.length) {
+      for (var i = 0; i < g2gBlocklist.names.length; i++) {
+        if (n.indexOf(g2gBlocklist.names[i]) >= 0) return true;
+      }
+    }
     return /(crap|shit|shithouse|poop|turd|fart|piss\s*house|pee\s*pee|my house|my home|private house|test toilet|dummy|xxx|asdf|lmao|haha)/i.test(n);
+  }
+
+  function isBlockedId(id) {
+    return !!(g2gBlocklist.ids && g2gBlocklist.ids[String(id)]);
   }
 
   function isChainPlace(tags) {
@@ -160,6 +181,9 @@
     if (lat == null || lng == null) return null;
     var rawName = osmName(tags);
     if (isJunkToilet(tags, rawName)) return null;
+    if (isNameJunk(rawName)) return null;
+    var oid = 'osm-' + el.type + '-' + el.id;
+    if (typeof isBlockedId === 'function' && isBlockedId(oid)) return null;
     var amenity = tags.amenity || 'toilets';
     var chain = isChainPlace(tags);
     var accessible = tags.wheelchair === 'yes' || tags.wheelchair === 'designated';
@@ -180,7 +204,7 @@
       noteParts.push('May be available to customers at this ' + amenity.replace(/_/g, ' '));
     }
     return {
-      i: 'osm-' + el.type + '-' + el.id,
+      i: oid,
       n: censor(rawName),
       lat: lat, lng: lng,
       a: !!accessible, b: !!baby,
