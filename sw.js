@@ -1,5 +1,9 @@
-const CACHE = 'gottogo-v7';
-const ASSETS = ['./', './index.html', './app.js', './styles.css', './manifest.json', './icon.svg', './settings-overlay.js', './mobile-search.css', './panel-ux.css'];
+const CACHE = 'gottogo-v8';
+const ASSETS = [
+  './', './index.html', './app.js', './styles.css', './manifest.json', './icon.svg',
+  './settings-overlay.js', './mobile-search.css', './panel-ux.css',
+  './blocklist.json', './f0.js', './f1.js', './f2.js', './f3.js', './proxy-shim.js'
+];
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)).then(() => self.skipWaiting()));
 });
@@ -12,7 +16,19 @@ self.addEventListener('activate', e => {
 self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
   if (url.origin !== location.origin) return;
-  if (url.pathname.endsWith('.js') || url.pathname.endsWith('.css') || url.pathname.endsWith('.html') || url.pathname.endsWith('/')) {
+  if (url.pathname.indexOf('/api/') === 0) {
+    e.respondWith(
+      fetch(e.request).then(res => {
+        if (res.ok && e.request.method === 'GET') {
+          const clone = res.clone();
+          caches.open(CACHE).then(c => c.put(e.request, clone));
+        }
+        return res;
+      }).catch(() => caches.match(e.request))
+    );
+    return;
+  }
+  if (url.pathname.endsWith('.js') || url.pathname.endsWith('.css') || url.pathname.endsWith('.html') || url.pathname.endsWith('.json') || url.pathname.endsWith('/')) {
     e.respondWith(
       fetch(e.request).then(res => {
         if (res.ok && e.request.method === 'GET') {
