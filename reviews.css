@@ -1,0 +1,18 @@
+.review-section{margin-top:8px;padding-top:14px;border-top:1px solid var(--border)}
+.review-title{font-size:1rem;margin:0 0 4px;font-weight:700}
+.review-hint{font-size:.75rem;color:var(--muted);margin:0 0 12px;line-height:1.4}
+.review-form{background:var(--bg);border:1px solid var(--border);border-radius:14px;padding:14px;margin-bottom:14px}
+.rate{display:flex;gap:6px;align-items:center;margin-bottom:10px}
+.rate button{background:var(--surface2);border:1px solid var(--border);border-radius:10px;width:42px;height:42px;color:var(--muted);cursor:pointer;font-size:1.25rem;line-height:1;padding:0}
+.rate button.on{border-color:var(--accent);color:var(--accent);background:rgba(251,146,60,.12)}
+.review-input{width:100%;box-sizing:border-box;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 12px;color:var(--text);font:inherit;font-size:.88rem;resize:vertical;min-height:56px}
+.review-input:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-glow)}
+.review-list{display:flex;flex-direction:column;gap:10px}
+.review-item{background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:12px 14px}
+.review-stars{margin-bottom:4px}
+.review-text{font-size:.88rem;line-height:1.45;color:var(--text);margin-bottom:4px}
+.review-meta{font-size:.72rem;color:var(--muted)}
+.review-empty{font-size:.85rem;color:var(--muted);text-align:center;padding:8px 0}
+.stars{color:var(--accent);letter-spacing:1px}
+.stars-sm{font-size:.85rem}
+.review-count{color:var(--muted);font-weight:500}

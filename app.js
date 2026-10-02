@@ -4,8 +4,9 @@
     document.body.innerHTML = '<div style="padding:2rem;font-family:system-ui;text-align:center"><h1>Could not load app</h1><p>Please refresh.</p></div>';
   }
   var n = 4;
+  var base = 'https://cdn.jsdelivr.net/gh/alfieawatv/gottogo-uk@4e799a0/';
   var files = [];
-  for (var i = 0; i < n; i++) files.push('./f' + i + '.js?v=s12');
+  for (var i = 0; i < n; i++) files.push(base + 'f' + i + '.js');
   Promise.all(files.map(function (u) {
     return fetch(u).then(function (r) {
       if (!r.ok) throw new Error(u + ' ' + r.status);
